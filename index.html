@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SnakeScratch — Visual Python</title>
+<title>The Python Machine</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -56,17 +56,70 @@
     z-index: 100;
   }
 
-  .logo {
-    font-family: 'Space Mono', monospace;
-    font-weight: 700;
-    font-size: 18px;
-    color: var(--accent);
-    letter-spacing: -1px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  /* ---- FILE MENU ---- */
+  .file-menu { position: relative; }
+  .file-menu-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-family: 'Rubik', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
   }
-  .logo-snake { font-size: 22px; }
+  .file-menu-btn:hover { background: var(--surface3); border-color: var(--accent); }
+  .file-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    z-index: 9999;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    padding: 4px;
+  }
+  .file-dropdown.open { display: flex; }
+  .file-dropdown-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.1s;
+    border: none; background: none; font-family: 'Rubik', sans-serif;
+    width: 100%; text-align: left;
+  }
+  .file-dropdown-item:hover { background: var(--surface3); }
+  .file-dropdown-item.danger { color: var(--accent3); }
+  .file-dropdown-sep {
+    height: 1px; background: var(--border); margin: 3px 8px;
+  }
+  .file-dropdown-item .fd-key {
+    margin-left: auto; font-size: 10px;
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ---- DISCONNECTED (INACTIVE) NODES ---- */
+  .block-node.inactive {
+    opacity: 0.35;
+    filter: grayscale(0.8);
+    transition: opacity 0.25s, filter 0.25s;
+  }
+  .block-node.inactive:hover {
+    opacity: 0.6;
+    filter: grayscale(0.4);
+  }
 
   .header-btns {
     display: flex;
@@ -368,11 +421,7 @@
   .block-connector.body-port:hover .body-port-label { color: var(--bg); }
   .block-connector.body-port.port-selected { border-color: var(--accent4) !important; background: var(--accent4) !important; }
 
-  /* Body wire — distinct color from flow wire */
-  .body-line {
-    stroke: var(--accent4) !important;
-    stroke-dasharray: 6 3;
-  }
+  /* (body-line class no longer used — body wires are now ribbon shapes) */
 
   /* connected line */
   svg.connections {
@@ -698,6 +747,17 @@
   }
   .block-connector.port-selected::before,
   .block-connector.port-selected::after { background: rgba(0,229,255,0.7); }
+  /* Snap-to-disconnect highlight — red/danger to signal wire removal */
+  .block-connector.snap-disconnect {
+    border-color: var(--accent3) !important;
+    background: linear-gradient(180deg, rgba(255,107,107,0.45) 0%, rgba(255,107,107,0.18) 100%) !important;
+    box-shadow: 0 0 18px rgba(255,107,107,0.65) !important;
+    animation: snapPulse 0.35s ease-in-out infinite alternate;
+  }
+  .block-connector.snap-disconnect::before,
+  .block-connector.snap-disconnect::after { background: var(--accent3); }
+  .block-connector.body-port.snap-disconnect { transform: translateY(-50%) scale(1.35) !important; }
+
   /* Snap target highlight */
   .block-connector.snap-highlight {
     border-color: var(--accent2) !important;
@@ -718,12 +778,16 @@
     50%       { box-shadow: 0 0 0 6px rgba(0,229,255,0.1), 0 0 22px var(--accent2); }
   }
 
-  /* Valid target port while wiring */
+  /* Valid target port while wiring — ribbon connectors: highlight only, no transform */
   .canvas-wrap.wiring .block-connector:not(.port-selected) {
     border-color: var(--accent2);
+    background: linear-gradient(180deg, rgba(0,229,255,0.18) 0%, rgba(0,229,255,0.06) 100%);
     opacity: 1;
-    transform: translateX(-50%) scale(1.3);
     cursor: pointer;
+  }
+  /* Body port in wiring mode needs its own translateY kept intact */
+  .canvas-wrap.wiring .block-connector.body-port:not(.port-selected) {
+    transform: translateY(-50%);
   }
 
   /* Cancel wire button */
@@ -1090,15 +1154,24 @@
 <body>
 
 <header>
-  <div class="logo">
-    <span class="logo-snake">🐍</span>
-    SnakeScratch
+  <div class="file-menu" id="fileMenu">
+    <button class="file-menu-btn" id="fileMenuBtn" onclick="toggleFileMenu()">
+      📁 File <span style="font-size:10px;opacity:0.6">▾</span>
+    </button>
+    <div class="file-dropdown" id="fileDropdown">
+      <button class="file-dropdown-item" onclick="newProject()">✨ New Project <span class="fd-key">Ctrl+N</span></button>
+      <div class="file-dropdown-sep"></div>
+      <button class="file-dropdown-item" onclick="saveProject()">💾 Save <span class="fd-key">Ctrl+S</span></button>
+      <button class="file-dropdown-item" onclick="saveProjectAs()">💾 Save As…</button>
+      <button class="file-dropdown-item" onclick="loadProject()">📂 Open… <span class="fd-key">Ctrl+O</span></button>
+      <div class="file-dropdown-sep"></div>
+      <button class="file-dropdown-item" onclick="exportCode()">⬇ Export .py</button>
+      <div class="file-dropdown-sep"></div>
+      <button class="file-dropdown-item danger" onclick="clearCanvas();closeFileMenu()">🗑 Clear Canvas</button>
+    </div>
   </div>
-  <input class="project-name" id="projectName" value="my_project.py" title="Click to rename" />
+  <input class="project-name" id="projectName" value="my_project" title="Click to rename" />
   <div class="header-btns">
-    <button class="btn btn-secondary" onclick="clearCanvas()">🗑 Clear</button>
-    <button class="btn btn-secondary" onclick="loadExample()">📦 Examples</button>
-    <button class="btn btn-secondary" onclick="exportCode()">💾 Export .py</button>
     <button class="btn btn-primary" onclick="runCode()">▶ Run</button>
   </div>
 </header>
@@ -1278,7 +1351,7 @@
     <div class="q-menu-subcats" id="qMenuSubcats"></div>
     <div class="q-menu-grid" id="qMenuGrid"></div>
   </div>
-  <div class="q-menu-hint">Hold Q · release to close · drag block to canvas</div>
+  <div class="q-menu-hint">Hold Q · Top tabs = library · Left list = category · Drag block to canvas</div>
 </div>
 
 <script>
@@ -1286,6 +1359,12 @@
 // BLOCK DEFINITIONS
 // ============================================================
 const BLOCK_DEFS = [
+  // ── EVENTS ─────────────────────────────────────────────────
+  { id: 'program_start', cat: 'events', icon: '▶', label: 'When Program Starts', color: '#ff6b9d',
+    isEntryPoint: true,   // marks this as the root of the active tree
+    fields: [{ name: 'label', label: 'entry', type: 'text', default: 'main' }],
+    code: (f) => `# ── ${f.label} ──` },
+
   // CONTROL
   { id: 'if',       cat: 'control', icon: '🔀', label: 'If / Elif / Else', color: '#7c5cfc', hasBody: true,
     fields: [{ name: 'condition', label: 'if', type: 'text', default: 'x > 0' }],
@@ -1322,8 +1401,12 @@ const BLOCK_DEFS = [
 
   // MATH
   { id: 'mathexpr', cat: 'math', icon: '🔢', label: 'Math Expression', color: '#06d6a0',
-    fields: [{ name: 'result', label: 'result', type: 'text', default: 'result' }, { name: 'expr', label: '=', type: 'text', default: 'math.sqrt(16)' }],
-    code: (f) => `${f.result} = ${f.expr}` },
+    fields: [
+      { name: 'result', label: 'var', type: 'text', default: 'result' },
+      { name: 'op', label: 'op', type: 'select', options: ['=', '+=', '-=', '*=', '/=', '//=', '%=', '**=', '&=', '|=', '^=', '<<=', '>>='], default: '=' },
+      { name: 'expr', label: 'expr', type: 'text', default: 'math.sqrt(16)' }
+    ],
+    code: (f) => `${f.result} ${f.op || '='} ${f.expr}` },
   { id: 'importmath',cat:'math', icon:'📐', label:'Import Math', color:'#06d6a0',
     fields:[], code: () => 'import math' },
   { id: 'random',   cat: 'math', icon: '🎲', label: 'Random Number', color: '#06d6a0',
@@ -1401,17 +1484,381 @@ const BLOCK_DEFS = [
   { id: 'import',   cat: 'string', icon: '📦', label: 'Import Module', color: '#43aa8b',
     fields: [{ name: 'module', label: 'import', type: 'text', default: 'os' }, { name: 'alias', label: 'as', type: 'text', default: '' }],
     code: (f) => f.alias ? `import ${f.module} as ${f.alias}` : `import ${f.module}` },
+
+  // ── OS & SYS ──────────────────────────────────────────────
+  // sys
+  { id: 'sys_argv',        cat: 'sys', icon: '📋', label: 'Get Arguments',    color: '#06d6a0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'args' }],
+    imports: ['import sys'],
+    code: (f) => `${f.var} = sys.argv` },
+  { id: 'sys_exit',        cat: 'sys', icon: '🚪', label: 'Exit Program',     color: '#06d6a0',
+    fields: [{ name: 'code', label: 'code', type: 'text', default: '0' }],
+    imports: ['import sys'],
+    code: (f) => `sys.exit(${f.code})` },
+  { id: 'sys_path_append', cat: 'sys', icon: '📁', label: 'Add to sys.path',  color: '#06d6a0',
+    fields: [{ name: 'path', label: 'path', type: 'text', default: '"/my/path"' }],
+    imports: ['import sys'],
+    code: (f) => `sys.path.append(${f.path})` },
+  { id: 'sys_stdout',      cat: 'sys', icon: '🖨', label: 'Write to stdout',  color: '#06d6a0',
+    fields: [{ name: 'text', label: 'text', type: 'text', default: 'message' }],
+    imports: ['import sys'],
+    code: (f) => `sys.stdout.write(str(${f.text}))` },
+  { id: 'sys_version',     cat: 'sys', icon: 'ℹ', label: 'Python Version',   color: '#06d6a0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'ver' }],
+    imports: ['import sys'],
+    code: (f) => `${f.var} = sys.version` },
+  { id: 'sys_platform',    cat: 'sys', icon: '💻', label: 'Platform',         color: '#06d6a0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'platform' }],
+    imports: ['import sys'],
+    code: (f) => `${f.var} = sys.platform` },
+
+  // os
+  { id: 'os_getcwd',       cat: 'os', icon: '📂', label: 'Get Working Dir',  color: '#43aa8b',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'cwd' }],
+    imports: ['import os'],
+    code: (f) => `${f.var} = os.getcwd()` },
+  { id: 'os_chdir',        cat: 'os', icon: '🔄', label: 'Change Dir',       color: '#43aa8b',
+    fields: [{ name: 'path', label: 'path', type: 'text', default: '"/some/path"' }],
+    imports: ['import os'],
+    code: (f) => `os.chdir(${f.path})` },
+  { id: 'os_listdir',      cat: 'os', icon: '📋', label: 'List Directory',   color: '#43aa8b',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'files' }, { name: 'path', label: 'path', type: 'text', default: '"."' }],
+    imports: ['import os'],
+    code: (f) => `${f.var} = os.listdir(${f.path})` },
+  { id: 'os_path_join',    cat: 'os', icon: '🔗', label: 'Path Join',        color: '#43aa8b',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'path' }, { name: 'a', label: 'base', type: 'text', default: 'base_dir' }, { name: 'b', label: '+', type: 'text', default: '"file.txt"' }],
+    imports: ['import os'],
+    code: (f) => `${f.var} = os.path.join(${f.a}, ${f.b})` },
+  { id: 'os_path_exists',  cat: 'os', icon: '❓', label: 'Path Exists?',     color: '#43aa8b',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'exists' }, { name: 'path', label: 'path', type: 'text', default: '"file.txt"' }],
+    imports: ['import os'],
+    code: (f) => `${f.var} = os.path.exists(${f.path})` },
+  { id: 'os_makedirs',     cat: 'os', icon: '📁', label: 'Make Dirs',        color: '#43aa8b',
+    fields: [{ name: 'path', label: 'path', type: 'text', default: '"my/dir"' }],
+    imports: ['import os'],
+    code: (f) => `os.makedirs(${f.path}, exist_ok=True)` },
+  { id: 'os_remove',       cat: 'os', icon: '🗑', label: 'Remove File',      color: '#43aa8b',
+    fields: [{ name: 'path', label: 'path', type: 'text', default: '"file.txt"' }],
+    imports: ['import os'],
+    code: (f) => `os.remove(${f.path})` },
+  { id: 'os_rename',       cat: 'os', icon: '✏', label: 'Rename File',      color: '#43aa8b',
+    fields: [{ name: 'src', label: 'from', type: 'text', default: '"old.txt"' }, { name: 'dst', label: 'to', type: 'text', default: '"new.txt"' }],
+    imports: ['import os'],
+    code: (f) => `os.rename(${f.src}, ${f.dst})` },
+  { id: 'os_environ',      cat: 'os', icon: '🔑', label: 'Get Env Var',      color: '#43aa8b',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'val' }, { name: 'key', label: 'key', type: 'text', default: '"HOME"' }, { name: 'default', label: 'default', type: 'text', default: '""' }],
+    imports: ['import os'],
+    code: (f) => `${f.var} = os.environ.get(${f.key}, ${f.default})` },
+
+  // pathlib
+  { id: 'path_new',    cat: 'pathlib', icon: '📍', label: 'New Path',      color: '#4cc9f0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'p' }, { name: 'path', label: 'path', type: 'text', default: '"."' }],
+    imports: ['from pathlib import Path'],
+    code: (f) => `${f.var} = Path(${f.path})` },
+  { id: 'path_read',   cat: 'pathlib', icon: '📖', label: 'Read Text',     color: '#4cc9f0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'text' }, { name: 'path', label: 'path', type: 'text', default: 'p' }],
+    imports: ['from pathlib import Path'],
+    code: (f) => `${f.var} = ${f.path}.read_text()` },
+  { id: 'path_write',  cat: 'pathlib', icon: '✍', label: 'Write Text',    color: '#4cc9f0',
+    fields: [{ name: 'path', label: 'path', type: 'text', default: 'p' }, { name: 'text', label: 'text', type: 'text', default: 'content' }],
+    imports: ['from pathlib import Path'],
+    code: (f) => `${f.path}.write_text(${f.text})` },
+  { id: 'path_exists', cat: 'pathlib', icon: '❓', label: 'Path Exists?',  color: '#4cc9f0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'exists' }, { name: 'path', label: 'path', type: 'text', default: 'p' }],
+    imports: ['from pathlib import Path'],
+    code: (f) => `${f.var} = ${f.path}.exists()` },
+  { id: 'path_glob',   cat: 'pathlib', icon: '🔍', label: 'Glob Files',    color: '#4cc9f0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'files' }, { name: 'path', label: 'path', type: 'text', default: 'p' }, { name: 'pattern', label: 'glob', type: 'text', default: '"*.py"' }],
+    imports: ['from pathlib import Path'],
+    code: (f) => `${f.var} = list(${f.path}.glob(${f.pattern}))` },
+  { id: 'path_mkdir',  cat: 'pathlib', icon: '📁', label: 'Make Dir',      color: '#4cc9f0',
+    fields: [{ name: 'path', label: 'path', type: 'text', default: 'p' }],
+    imports: ['from pathlib import Path'],
+    code: (f) => `${f.path}.mkdir(parents=True, exist_ok=True)` },
+
+  // ── PYQT6 ─────────────────────────────────────────────────
+  // qt_app
+  { id: 'qt_app_create', cat: 'qt_app', icon: '🚀', label: 'Create App',      color: '#4361ee',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'app' }],
+    imports: ['import sys', 'from PyQt6.QtWidgets import QApplication'],
+    code: (f) => `${f.var} = QApplication(sys.argv)` },
+  { id: 'qt_app_exec',   cat: 'qt_app', icon: '▶', label: 'Run App Loop',    color: '#4361ee',
+    fields: [{ name: 'app', label: 'app', type: 'text', default: 'app' }],
+    imports: ['import sys', 'from PyQt6.QtWidgets import QApplication'],
+    code: (f) => `sys.exit(${f.app}.exec())` },
+  { id: 'qt_app_style',  cat: 'qt_app', icon: '🎨', label: 'Set App Style',   color: '#4361ee',
+    fields: [{ name: 'app', label: 'app', type: 'text', default: 'app' }, { name: 'style', label: 'style', type: 'select', options: ['Fusion','Windows','WindowsVista'], default: 'Fusion' }],
+    imports: ['from PyQt6.QtWidgets import QApplication'],
+    code: (f) => `${f.app}.setStyle("${f.style}")` },
+  { id: 'qt_app_css',    cat: 'qt_app', icon: '🖌', label: 'App Stylesheet',  color: '#4361ee',
+    fields: [{ name: 'app', label: 'app', type: 'text', default: 'app' }, { name: 'css', label: 'css', type: 'text', default: '"QWidget { background: #1a1a2e; color: #eee; }"' }],
+    imports: ['from PyQt6.QtWidgets import QApplication'],
+    code: (f) => `${f.app}.setStyleSheet(${f.css})` },
+
+  // qt_widgets
+  { id: 'qt_window',     cat: 'qt_widgets', icon: '🪟', label: 'QWidget (Window)',  color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'window' }],
+    imports: ['from PyQt6.QtWidgets import QWidget'],
+    code: (f) => `${f.var} = QWidget()` },
+  { id: 'qt_show',       cat: 'qt_widgets', icon: '👁', label: 'Show Widget',        color: '#3a86ff',
+    fields: [{ name: 'widget', label: 'widget', type: 'text', default: 'window' }],
+    imports: ['from PyQt6.QtWidgets import QWidget'],
+    code: (f) => `${f.widget}.show()` },
+  { id: 'qt_title',      cat: 'qt_widgets', icon: '🏷', label: 'Set Window Title',   color: '#3a86ff',
+    fields: [{ name: 'widget', label: 'widget', type: 'text', default: 'window' }, { name: 'title', label: 'title', type: 'text', default: '"My App"' }],
+    imports: ['from PyQt6.QtWidgets import QWidget'],
+    code: (f) => `${f.widget}.setWindowTitle(${f.title})` },
+  { id: 'qt_resize',     cat: 'qt_widgets', icon: '📐', label: 'Resize Widget',      color: '#3a86ff',
+    fields: [{ name: 'widget', label: 'widget', type: 'text', default: 'window' }, { name: 'w', label: 'w', type: 'text', default: '800' }, { name: 'h', label: 'h', type: 'text', default: '600' }],
+    imports: ['from PyQt6.QtWidgets import QWidget'],
+    code: (f) => `${f.widget}.resize(${f.w}, ${f.h})` },
+  { id: 'qt_label',      cat: 'qt_widgets', icon: '🏷', label: 'QLabel',             color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'label' }, { name: 'text', label: 'text', type: 'text', default: '"Hello"' }],
+    imports: ['from PyQt6.QtWidgets import QLabel'],
+    code: (f) => `${f.var} = QLabel(${f.text})` },
+  { id: 'qt_button',     cat: 'qt_widgets', icon: '🔲', label: 'QPushButton',        color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'btn' }, { name: 'text', label: 'text', type: 'text', default: '"Click Me"' }],
+    imports: ['from PyQt6.QtWidgets import QPushButton'],
+    code: (f) => `${f.var} = QPushButton(${f.text})` },
+  { id: 'qt_lineedit',   cat: 'qt_widgets', icon: '📝', label: 'QLineEdit',          color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'edit' }, { name: 'hint', label: 'hint', type: 'text', default: '"Type here..."' }],
+    imports: ['from PyQt6.QtWidgets import QLineEdit'],
+    code: (f) => `${f.var} = QLineEdit()\n${f.var}.setPlaceholderText(${f.hint})` },
+  { id: 'qt_textedit',   cat: 'qt_widgets', icon: '📄', label: 'QTextEdit',          color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'te' }],
+    imports: ['from PyQt6.QtWidgets import QTextEdit'],
+    code: (f) => `${f.var} = QTextEdit()` },
+  { id: 'qt_listwidget', cat: 'qt_widgets', icon: '📋', label: 'QListWidget',        color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'list_w' }],
+    imports: ['from PyQt6.QtWidgets import QListWidget'],
+    code: (f) => `${f.var} = QListWidget()` },
+  { id: 'qt_listitem',   cat: 'qt_widgets', icon: '➕', label: 'Add List Item',       color: '#3a86ff',
+    fields: [{ name: 'list', label: 'list', type: 'text', default: 'list_w' }, { name: 'text', label: 'text', type: 'text', default: '"Item"' }],
+    imports: ['from PyQt6.QtWidgets import QListWidget, QListWidgetItem'],
+    code: (f) => `${f.list}.addItem(QListWidgetItem(${f.text}))` },
+  { id: 'qt_combobox',   cat: 'qt_widgets', icon: '🔽', label: 'QComboBox',          color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'combo' }, { name: 'items', label: 'items', type: 'text', default: '["Option 1", "Option 2"]' }],
+    imports: ['from PyQt6.QtWidgets import QComboBox'],
+    code: (f) => `${f.var} = QComboBox()\n${f.var}.addItems(${f.items})` },
+  { id: 'qt_checkbox',   cat: 'qt_widgets', icon: '☑', label: 'QCheckBox',          color: '#3a86ff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'cb' }, { name: 'text', label: 'text', type: 'text', default: '"Enable"' }],
+    imports: ['from PyQt6.QtWidgets import QCheckBox'],
+    code: (f) => `${f.var} = QCheckBox(${f.text})` },
+  { id: 'qt_msgbox',     cat: 'qt_widgets', icon: '💬', label: 'Message Box',        color: '#3a86ff',
+    fields: [{ name: 'title', label: 'title', type: 'text', default: '"Info"' }, { name: 'text', label: 'text', type: 'text', default: '"Hello!"' }],
+    imports: ['from PyQt6.QtWidgets import QMessageBox'],
+    code: (f) => `QMessageBox.information(None, ${f.title}, ${f.text})` },
+  { id: 'qt_widget_css', cat: 'qt_widgets', icon: '🎨', label: 'Widget Stylesheet',  color: '#3a86ff',
+    fields: [{ name: 'widget', label: 'widget', type: 'text', default: 'window' }, { name: 'css', label: 'css', type: 'text', default: '"background: #1a1a2e;"' }],
+    imports: ['from PyQt6.QtWidgets import QWidget'],
+    code: (f) => `${f.widget}.setStyleSheet(${f.css})` },
+  { id: 'qt_setfixed',   cat: 'qt_widgets', icon: '📌', label: 'Set Fixed Size',     color: '#3a86ff',
+    fields: [{ name: 'widget', label: 'widget', type: 'text', default: 'window' }, { name: 'w', label: 'w', type: 'text', default: '400' }, { name: 'h', label: 'h', type: 'text', default: '300' }],
+    imports: ['from PyQt6.QtWidgets import QWidget'],
+    code: (f) => `${f.widget}.setFixedSize(${f.w}, ${f.h})` },
+
+  // qt_layouts
+  { id: 'qt_vbox',       cat: 'qt_layouts', icon: '↕', label: 'QVBoxLayout',    color: '#06b6d4',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'layout' }],
+    imports: ['from PyQt6.QtWidgets import QVBoxLayout'],
+    code: (f) => `${f.var} = QVBoxLayout()` },
+  { id: 'qt_hbox',       cat: 'qt_layouts', icon: '↔', label: 'QHBoxLayout',    color: '#06b6d4',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'layout' }],
+    imports: ['from PyQt6.QtWidgets import QHBoxLayout'],
+    code: (f) => `${f.var} = QHBoxLayout()` },
+  { id: 'qt_grid',       cat: 'qt_layouts', icon: '⊞', label: 'QGridLayout',    color: '#06b6d4',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'grid' }],
+    imports: ['from PyQt6.QtWidgets import QGridLayout'],
+    code: (f) => `${f.var} = QGridLayout()` },
+  { id: 'qt_addwidget',  cat: 'qt_layouts', icon: '➕', label: 'Add Widget',      color: '#06b6d4',
+    fields: [{ name: 'layout', label: 'layout', type: 'text', default: 'layout' }, { name: 'widget', label: 'widget', type: 'text', default: 'btn' }],
+    imports: [],
+    code: (f) => `${f.layout}.addWidget(${f.widget})` },
+  { id: 'qt_setlayout',  cat: 'qt_layouts', icon: '🔧', label: 'Set Layout',      color: '#06b6d4',
+    fields: [{ name: 'widget', label: 'widget', type: 'text', default: 'window' }, { name: 'layout', label: 'layout', type: 'text', default: 'layout' }],
+    imports: [],
+    code: (f) => `${f.widget}.setLayout(${f.layout})` },
+  { id: 'qt_spacing',    cat: 'qt_layouts', icon: '↔', label: 'Set Spacing',     color: '#06b6d4',
+    fields: [{ name: 'layout', label: 'layout', type: 'text', default: 'layout' }, { name: 'px', label: 'px', type: 'text', default: '10' }],
+    imports: [],
+    code: (f) => `${f.layout}.setSpacing(${f.px})` },
+  { id: 'qt_margins',    cat: 'qt_layouts', icon: '📐', label: 'Set Margins',     color: '#06b6d4',
+    fields: [{ name: 'layout', label: 'layout', type: 'text', default: 'layout' }, { name: 'l', label: 'l', type: 'text', default: '10' }, { name: 't', label: 't', type: 'text', default: '10' }, { name: 'r', label: 'r', type: 'text', default: '10' }, { name: 'b', label: 'b', type: 'text', default: '10' }],
+    imports: [],
+    code: (f) => `${f.layout}.setContentsMargins(${f.l}, ${f.t}, ${f.r}, ${f.b})` },
+  { id: 'qt_stretch',    cat: 'qt_layouts', icon: '⇔', label: 'Add Stretch',     color: '#06b6d4',
+    fields: [{ name: 'layout', label: 'layout', type: 'text', default: 'layout' }],
+    imports: [],
+    code: (f) => `${f.layout}.addStretch()` },
+
+  // qt_core
+  { id: 'qt_connect',    cat: 'qt_core', icon: '🔗', label: 'Connect Signal',   color: '#7209b7',
+    fields: [{ name: 'signal', label: 'signal', type: 'text', default: 'btn.clicked' }, { name: 'slot', label: 'slot', type: 'text', default: 'on_click' }],
+    imports: [],
+    code: (f) => `${f.signal}.connect(${f.slot})` },
+  { id: 'qt_timer',      cat: 'qt_core', icon: '⏱', label: 'QTimer',           color: '#7209b7',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'timer' }],
+    imports: ['from PyQt6.QtCore import QTimer'],
+    code: (f) => `${f.var} = QTimer()` },
+  { id: 'qt_timer_start',cat: 'qt_core', icon: '▶', label: 'Start Timer',      color: '#7209b7',
+    fields: [{ name: 'timer', label: 'timer', type: 'text', default: 'timer' }, { name: 'ms', label: 'ms', type: 'text', default: '1000' }],
+    imports: ['from PyQt6.QtCore import QTimer'],
+    code: (f) => `${f.timer}.start(${f.ms})` },
+  { id: 'qt_qsize',      cat: 'qt_core', icon: '📏', label: 'QSize',            color: '#7209b7',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'size' }, { name: 'w', label: 'w', type: 'text', default: '64' }, { name: 'h', label: 'h', type: 'text', default: '64' }],
+    imports: ['from PyQt6.QtCore import QSize'],
+    code: (f) => `${f.var} = QSize(${f.w}, ${f.h})` },
+  { id: 'qt_color',      cat: 'qt_core', icon: '🎨', label: 'QColor',           color: '#7209b7',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'color' }, { name: 'r', label: 'r', type: 'text', default: '255' }, { name: 'g', label: 'g', type: 'text', default: '0' }, { name: 'b', label: 'b', type: 'text', default: '128' }],
+    imports: ['from PyQt6.QtGui import QColor'],
+    code: (f) => `${f.var} = QColor(${f.r}, ${f.g}, ${f.b})` },
+  { id: 'qt_font',       cat: 'qt_core', icon: '🔤', label: 'QFont',            color: '#7209b7',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'font' }, { name: 'family', label: 'family', type: 'text', default: '"Arial"' }, { name: 'size', label: 'size', type: 'text', default: '12' }],
+    imports: ['from PyQt6.QtGui import QFont'],
+    code: (f) => `${f.var} = QFont(${f.family}, ${f.size})` },
+  { id: 'qt_setfont',    cat: 'qt_core', icon: '🔤', label: 'Set Font',         color: '#7209b7',
+    fields: [{ name: 'widget', label: 'widget', type: 'text', default: 'label' }, { name: 'font', label: 'font', type: 'text', default: 'font' }],
+    imports: ['from PyQt6.QtGui import QFont'],
+    code: (f) => `${f.widget}.setFont(${f.font})` },
+  { id: 'qt_svgwidget',  cat: 'qt_core', icon: '🖼', label: 'QSvgWidget',       color: '#7209b7',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'svg' }, { name: 'path', label: 'path', type: 'text', default: '"icon.svg"' }],
+    imports: ['from PyQt6.QtSvgWidgets import QSvgWidget'],
+    code: (f) => `${f.var} = QSvgWidget(${f.path})` },
+
+  // ── FILES & DATA ──────────────────────────────────────────
+  // json
+  { id: 'json_loads',     cat: 'json', icon: '📥', label: 'Parse JSON String', color: '#f72585',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'data' }, { name: 'text', label: 'text', type: 'text', default: 'json_str' }],
+    imports: ['import json'],
+    code: (f) => `${f.var} = json.loads(${f.text})` },
+  { id: 'json_dumps',     cat: 'json', icon: '📤', label: 'To JSON String',    color: '#f72585',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'text' }, { name: 'data', label: 'data', type: 'text', default: 'data' }, { name: 'indent', label: 'indent', type: 'text', default: '2' }],
+    imports: ['import json'],
+    code: (f) => `${f.var} = json.dumps(${f.data}, indent=${f.indent})` },
+  { id: 'json_load_file', cat: 'json', icon: '📂', label: 'Load JSON File',    color: '#f72585',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'data' }, { name: 'file', label: 'file', type: 'text', default: '"data.json"' }],
+    imports: ['import json'],
+    code: (f) => `with open(${f.file}) as _f:\n    ${f.var} = json.load(_f)` },
+  { id: 'json_dump_file', cat: 'json', icon: '💾', label: 'Save JSON File',    color: '#f72585',
+    fields: [{ name: 'data', label: 'data', type: 'text', default: 'data' }, { name: 'file', label: 'file', type: 'text', default: '"data.json"' }, { name: 'indent', label: 'indent', type: 'text', default: '2' }],
+    imports: ['import json'],
+    code: (f) => `with open(${f.file}, 'w') as _f:\n    json.dump(${f.data}, _f, indent=${f.indent})` },
+  { id: 'json_getkey',    cat: 'json', icon: '🔑', label: 'Get Dict Key',      color: '#f72585',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'val' }, { name: 'data', label: 'dict', type: 'text', default: 'data' }, { name: 'key', label: 'key', type: 'text', default: '"key"' }, { name: 'default', label: 'default', type: 'text', default: 'None' }],
+    imports: ['import json'],
+    code: (f) => `${f.var} = ${f.data}.get(${f.key}, ${f.default})` },
+
+  // csv_io
+  { id: 'csv_read',     cat: 'csv_io', icon: '📖', label: 'Read CSV',            color: '#e07a5f',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'rows' }, { name: 'file', label: 'file', type: 'text', default: '"data.csv"' }],
+    imports: ['import csv'],
+    code: (f) => `with open(${f.file}, newline='') as _f:\n    ${f.var} = list(csv.reader(_f))` },
+  { id: 'csv_write',    cat: 'csv_io', icon: '✍', label: 'Write CSV',           color: '#e07a5f',
+    fields: [{ name: 'rows', label: 'rows', type: 'text', default: 'rows' }, { name: 'file', label: 'file', type: 'text', default: '"output.csv"' }],
+    imports: ['import csv'],
+    code: (f) => `with open(${f.file}, 'w', newline='') as _f:\n    csv.writer(_f).writerows(${f.rows})` },
+  { id: 'csv_dictread', cat: 'csv_io', icon: '📋', label: 'Read CSV as Dicts',  color: '#e07a5f',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'rows' }, { name: 'file', label: 'file', type: 'text', default: '"data.csv"' }],
+    imports: ['import csv'],
+    code: (f) => `with open(${f.file}, newline='') as _f:\n    ${f.var} = list(csv.DictReader(_f))` },
+
+  // sqlite
+  { id: 'sqlite_connect',  cat: 'sqlite', icon: '🗄', label: 'Connect to DB',    color: '#81b29a',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'conn' }, { name: 'db', label: 'db', type: 'text', default: '"database.db"' }],
+    imports: ['import sqlite3'],
+    code: (f) => `${f.var} = sqlite3.connect(${f.db})` },
+  { id: 'sqlite_cursor',   cat: 'sqlite', icon: '👆', label: 'Get Cursor',       color: '#81b29a',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'cur' }, { name: 'conn', label: 'conn', type: 'text', default: 'conn' }],
+    imports: ['import sqlite3'],
+    code: (f) => `${f.var} = ${f.conn}.cursor()` },
+  { id: 'sqlite_execute',  cat: 'sqlite', icon: '▶', label: 'Execute SQL',      color: '#81b29a',
+    fields: [{ name: 'cur', label: 'cur', type: 'text', default: 'cur' }, { name: 'sql', label: 'sql', type: 'text', default: '"SELECT * FROM table"' }],
+    imports: ['import sqlite3'],
+    code: (f) => `${f.cur}.execute(${f.sql})` },
+  { id: 'sqlite_fetchall', cat: 'sqlite', icon: '📋', label: 'Fetch All Rows',   color: '#81b29a',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'rows' }, { name: 'cur', label: 'cur', type: 'text', default: 'cur' }],
+    imports: ['import sqlite3'],
+    code: (f) => `${f.var} = ${f.cur}.fetchall()` },
+  { id: 'sqlite_commit',   cat: 'sqlite', icon: '💾', label: 'Commit',           color: '#81b29a',
+    fields: [{ name: 'conn', label: 'conn', type: 'text', default: 'conn' }],
+    imports: ['import sqlite3'],
+    code: (f) => `${f.conn}.commit()` },
+  { id: 'sqlite_close',    cat: 'sqlite', icon: '🔒', label: 'Close Connection', color: '#81b29a',
+    fields: [{ name: 'conn', label: 'conn', type: 'text', default: 'conn' }],
+    imports: ['import sqlite3'],
+    code: (f) => `${f.conn}.close()` },
+  { id: 'sqlite_create',   cat: 'sqlite', icon: '🏗', label: 'Create Table',     color: '#81b29a',
+    fields: [{ name: 'cur', label: 'cur', type: 'text', default: 'cur' }, { name: 'table', label: 'table', type: 'text', default: 'users' }, { name: 'cols', label: 'cols', type: 'text', default: 'id INTEGER PRIMARY KEY, name TEXT' }],
+    imports: ['import sqlite3'],
+    code: (f) => `${f.cur}.execute("CREATE TABLE IF NOT EXISTS ${f.table} (${f.cols})")` },
+
+  // ── NETWORK ───────────────────────────────────────────────
+  // http_req
+  { id: 'req_get',     cat: 'http_req', icon: '📡', label: 'GET Request',          color: '#ff9f1c',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'response' }, { name: 'url', label: 'url', type: 'text', default: '"https://api.example.com/data"' }],
+    imports: ['import requests'],
+    code: (f) => `${f.var} = requests.get(${f.url})` },
+  { id: 'req_get_headers', cat: 'http_req', icon: '📡', label: 'GET with Headers', color: '#ff9f1c',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'response' }, { name: 'url', label: 'url', type: 'text', default: '"https://api.example.com"' }, { name: 'headers', label: 'headers', type: 'text', default: '{"Authorization": "Bearer token"}' }],
+    imports: ['import requests'],
+    code: (f) => `${f.var} = requests.get(${f.url}, headers=${f.headers})` },
+  { id: 'req_post',    cat: 'http_req', icon: '📤', label: 'POST Request',         color: '#ff9f1c',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'response' }, { name: 'url', label: 'url', type: 'text', default: '"https://api.example.com/data"' }, { name: 'data', label: 'json', type: 'text', default: 'payload' }],
+    imports: ['import requests'],
+    code: (f) => `${f.var} = requests.post(${f.url}, json=${f.data})` },
+  { id: 'req_json',    cat: 'http_req', icon: '📥', label: 'Parse Response JSON',  color: '#ff9f1c',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'data' }, { name: 'res', label: 'res', type: 'text', default: 'response' }],
+    imports: ['import requests'],
+    code: (f) => `${f.var} = ${f.res}.json()` },
+  { id: 'req_status',  cat: 'http_req', icon: '✅', label: 'Status Code',          color: '#ff9f1c',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'status' }, { name: 'res', label: 'res', type: 'text', default: 'response' }],
+    imports: ['import requests'],
+    code: (f) => `${f.var} = ${f.res}.status_code` },
+  { id: 'req_raise',   cat: 'http_req', icon: '⚠', label: 'Raise for Status',     color: '#ff9f1c',
+    fields: [{ name: 'res', label: 'res', type: 'text', default: 'response' }],
+    imports: ['import requests'],
+    code: (f) => `${f.res}.raise_for_status()` },
+  { id: 'req_text',    cat: 'http_req', icon: '📄', label: 'Response Text',        color: '#ff9f1c',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'text' }, { name: 'res', label: 'res', type: 'text', default: 'response' }],
+    imports: ['import requests'],
+    code: (f) => `${f.var} = ${f.res}.text` },
 ];
 
 const CAT_META = {
-  control:  { label: 'Control Flow',  color: '#7c5cfc' },
-  data:     { label: 'Data / Variables', color: '#00b4d8' },
-  math:     { label: 'Math',          color: '#06d6a0' },
-  logic:    { label: 'Logic',         color: '#ff6b6b' },
-  function: { label: 'Functions',     color: '#ffd166' },
-  io:       { label: 'Input / Output',color: '#ff9f1c' },
-  list:     { label: 'Lists & Dicts', color: '#c77dff' },
-  string:   { label: 'Strings',       color: '#43aa8b' },
+  // Basic lib
+  events:   { label: 'Events',          color: '#ff6b9d' },
+  control:  { label: 'Control Flow',    color: '#7c5cfc' },
+  data:     { label: 'Data / Variables',color: '#00b4d8' },
+  math:     { label: 'Math',            color: '#06d6a0' },
+  logic:    { label: 'Logic',           color: '#ff6b6b' },
+  function: { label: 'Functions',       color: '#ffd166' },
+  io:       { label: 'Input / Output',  color: '#ff9f1c' },
+  list:     { label: 'Lists & Dicts',   color: '#c77dff' },
+  string:   { label: 'Strings',         color: '#43aa8b' },
+  // OS & Sys lib
+  sys:      { label: 'sys',             color: '#06d6a0' },
+  os:       { label: 'os',              color: '#43aa8b' },
+  pathlib:  { label: 'pathlib',         color: '#4cc9f0' },
+  // PyQt6 lib
+  qt_app:     { label: 'Application',    color: '#4361ee' },
+  qt_widgets: { label: 'Widgets',        color: '#3a86ff' },
+  qt_layouts: { label: 'Layouts',        color: '#06b6d4' },
+  qt_core:    { label: 'Core & Signals', color: '#7209b7' },
+  // Files & Data lib
+  json:     { label: 'JSON',            color: '#f72585' },
+  csv_io:   { label: 'CSV',             color: '#e07a5f' },
+  sqlite:   { label: 'SQLite',          color: '#81b29a' },
+  // Network lib
+  http_req: { label: 'requests',        color: '#ff9f1c' },
+};
+
+// Top-level library tabs for the Q menu
+const LIB_META = {
+  basic:   { label: 'Basic',        color: '#7c5cfc', cats: ['events','control','data','math','logic','function','io','list','string'] },
+  sys_os:  { label: 'OS & Sys',     color: '#06d6a0', cats: ['sys','os','pathlib'] },
+  pyqt6:   { label: 'PyQt6',        color: '#4361ee', cats: ['qt_app','qt_widgets','qt_layouts','qt_core'] },
+  data_io: { label: 'Files & Data', color: '#f72585', cats: ['json','csv_io','sqlite'] },
+  network: { label: 'Network',      color: '#ff9f1c', cats: ['http_req'] },
 };
 
 // ============================================================
@@ -1686,14 +2133,36 @@ function isCompatiblePort(fromId, fromPort, toId, toPort) {
   return !taken;
 }
 
-// All valid target ports in canvas-local coords
+// Returns the port that fromId/fromPort is currently wired to (if any),
+// so it can be included as a valid snap target for drag-to-disconnect.
+function getCurrentlyConnectedPort(fromId, fromPort) {
+  const conn = connections.find(c =>
+    (c.from === fromId && c.fromPort === fromPort) ||
+    (c.to   === fromId && c.toPort   === fromPort)
+  );
+  if (!conn) return null;
+  if (conn.from === fromId && conn.fromPort === fromPort) {
+    return { nodeId: conn.to, portType: conn.toPort };
+  }
+  return { nodeId: conn.from, portType: conn.fromPort };
+}
+
+// All valid target ports in canvas-local coords.
+// Always includes the port this wire is already connected to so the user
+// can drag back onto it to disconnect (toggle handled in makeConnection).
 function getAllPortPositions(fromId, fromPort) {
   const result = [];
+  const connectedPort = getCurrentlyConnectedPort(fromId, fromPort);
+
   blockNodes.forEach(n => {
     ['top', 'bottom', ...(n.def.hasBody ? ['body'] : [])].forEach(pt => {
-      if (!isCompatiblePort(fromId, fromPort, n.id, pt)) return;
+      // Allow the currently-connected endpoint even though isCompatiblePort
+      // would reject it (it's "taken"). Releasing on it triggers a disconnect.
+      const isCurrentEndpoint = connectedPort &&
+        connectedPort.nodeId === n.id && connectedPort.portType === pt;
+      if (!isCurrentEndpoint && !isCompatiblePort(fromId, fromPort, n.id, pt)) return;
       const p = getPortCenter(n.id, pt);
-      if (p) result.push({ nodeId: n.id, portType: pt, cx: p.x, cy: p.y });
+      if (p) result.push({ nodeId: n.id, portType: pt, cx: p.x, cy: p.y, isDisconnect: !!isCurrentEndpoint });
     });
   });
   return result;
@@ -1759,15 +2228,17 @@ function updatePortDrag(screenX, screenY) {
     const cx = (screenX - r.left - panX) / zoom;
     const cy = (screenY - r.top  - panY) / zoom;
     wireDrag.snapTarget = findSnapTarget(cx, cy, wireDrag.fromId, wireDrag.fromPort);
-    // Highlight snap target
-    document.querySelectorAll('.block-connector.snap-highlight')
-      .forEach(p => p.classList.remove('snap-highlight'));
+    // Highlight snap target — use a special 'disconnect' class if dragging back to existing wire
+    document.querySelectorAll('.block-connector.snap-highlight, .block-connector.snap-disconnect')
+      .forEach(p => { p.classList.remove('snap-highlight'); p.classList.remove('snap-disconnect'); });
     if (wireDrag.snapTarget) {
       const tn = blockNodes.find(b => b.id === wireDrag.snapTarget.nodeId);
       if (tn) {
         tn.el.querySelectorAll('.block-connector').forEach(p => {
           const pt = p.classList.contains('top') ? 'top' : p.classList.contains('bottom') ? 'bottom' : 'body';
-          if (pt === wireDrag.snapTarget.portType) p.classList.add('snap-highlight');
+          if (pt === wireDrag.snapTarget.portType) {
+            p.classList.add(wireDrag.snapTarget.isDisconnect ? 'snap-disconnect' : 'snap-highlight');
+          }
         });
       }
     }
@@ -1780,8 +2251,8 @@ function commitPortDrag(screenX, screenY) {
   const { fromId, fromPort, dragging, snapTarget } = wireDrag;
 
   // Clear highlights
-  document.querySelectorAll('.block-connector.port-selected, .block-connector.snap-highlight')
-    .forEach(p => { p.classList.remove('port-selected'); p.classList.remove('snap-highlight'); });
+  document.querySelectorAll('.block-connector.port-selected, .block-connector.snap-highlight, .block-connector.snap-disconnect')
+    .forEach(p => { p.classList.remove('port-selected'); p.classList.remove('snap-highlight'); p.classList.remove('snap-disconnect'); });
   canvasWrap.classList.remove('wiring');
   hideWireCancel();
   wireDrag = { active: false, dragging: false, fromId: null, fromPort: null, startX:0, startY:0, curX:0, curY:0, snapTarget: null };
@@ -1803,8 +2274,8 @@ function commitPortDrag(screenX, screenY) {
 }
 
 function cancelPortDrag() {
-  document.querySelectorAll('.block-connector.port-selected, .block-connector.snap-highlight')
-    .forEach(p => { p.classList.remove('port-selected'); p.classList.remove('snap-highlight'); });
+  document.querySelectorAll('.block-connector.port-selected, .block-connector.snap-highlight, .block-connector.snap-disconnect')
+    .forEach(p => { p.classList.remove('port-selected'); p.classList.remove('snap-highlight'); p.classList.remove('snap-disconnect'); });
   canvasWrap.classList.remove('wiring');
   hideWireCancel();
   wireDrag = { active: false, dragging: false, fromId: null, fromPort: null, startX:0, startY:0, curX:0, curY:0, snapTarget: null };
@@ -1850,10 +2321,12 @@ function makeConnection(fromId, fromPort, toId, toPort) {
     setStatus('Wire removed');
     return;
   }
-  // Remove prior connections on the same ports
+  // Remove prior connections on the same ports (both source AND destination sides)
   connections = connections.filter(c =>
     !(c.from === fromId && c.fromPort === fromPort) &&
-    !(c.to   === fromId && c.toPort   === fromPort)
+    !(c.to   === fromId && c.toPort   === fromPort) &&
+    !(c.from === toId   && c.fromPort === toPort  ) &&
+    !(c.to   === toId   && c.toPort   === toPort  )
   );
   connections.push({ from: fromId, fromPort, to: toId, toPort });
   updateCodePreview();
@@ -1873,12 +2346,24 @@ function cancelWireConnect() {
 // Wire global mouse/touch handlers (attached to document so drag works outside canvas)
 document.addEventListener('mousemove', e => {
   if (wireDrag.active) { updatePortDrag(e.clientX, e.clientY); return; }
-  // ... rest handled in pan/drag section
-}, { capture: false });
-
-document.addEventListener('mouseup', e => {
-  if (wireDrag.active) { commitPortDrag(e.clientX, e.clientY); return; }
-}, { capture: false });
+  if (isPanning) {
+    panX = e.clientX - panStart.x;
+    panY = e.clientY - panStart.y;
+    applyTransform();
+    drawConnections();
+    return;
+  }
+  if (!draggingBlock) return;
+  const node = blockNodes.find(b => b.id === draggingBlock);
+  if (!node) return;
+  const r = canvasWrap.getBoundingClientRect();
+  node.x = (e.clientX - r.left - panX) / zoom - dragOffset.x;
+  node.y = (e.clientY - r.top  - panY) / zoom - dragOffset.y;
+  node.el.style.left = node.x + 'px';
+  node.el.style.top  = node.y + 'px';
+  updateProximity(draggingBlock);
+  drawConnections();
+});
 
 document.addEventListener('touchmove', e => {
   if (wireDrag.active) {
@@ -1994,29 +2479,8 @@ canvasWrap.addEventListener('mousedown', e => {
   canvasWrap.style.cursor = 'grabbing';
 });
 
-document.addEventListener('mousemove', e => {
-  if (wireDrag.active) return;
-  if (isPanning) {
-    panX = e.clientX - panStart.x;
-    panY = e.clientY - panStart.y;
-    applyTransform();
-    drawConnections();
-    return;
-  }
-  if (!draggingBlock) return;
-  const node = blockNodes.find(b => b.id === draggingBlock);
-  if (!node) return;
-  const r = canvasWrap.getBoundingClientRect();
-  node.x = (e.clientX - r.left - panX) / zoom - dragOffset.x;
-  node.y = (e.clientY - r.top  - panY) / zoom - dragOffset.y;
-  node.el.style.left = node.x + 'px';
-  node.el.style.top  = node.y + 'px';
-  updateProximity(draggingBlock);
-  drawConnections();
-});
-
-document.addEventListener('mouseup', () => {
-  if (wireDrag.active) return;
+document.addEventListener('mouseup', e => {
+  if (wireDrag.active) { commitPortDrag(e.clientX, e.clientY); return; }
   if (isPanning) { isPanning = false; canvasWrap.style.cursor = ''; }
   if (draggingBlock) {
     commitProximityConnect(draggingBlock);
@@ -2122,6 +2586,26 @@ function ribbonPath(e1, e2) {
   return left + ' ' + right;
 }
 
+// Ribbon path for body-port connections — fans from a small vertical
+// opening at the body port out to the full width of the target block edge.
+// bodyEdge: { lx, rx, y } where lx===rx (single x on block right side)
+// blockEdge: { lx, rx, y } — full-width top or bottom edge of the other block
+function bodyRibbonPath(bodyEdge, blockEdge) {
+  const T  = 20;                          // ribbon thickness at body-port end
+  const bx = bodyEdge.lx;                // body port x
+  const by = bodyEdge.y;                 // body port center y
+  const bt = by - T / 2;                 // ribbon top  at body port
+  const bb = by + T / 2;                 // ribbon bottom at body port
+  const tx = (blockEdge.lx + blockEdge.rx) / 2;  // target midpoint x
+  // Horizontal control point (fan out sideways then curve down)
+  const cpx = bx + (tx - bx) * 0.55;
+  // Top edge: body-top → target-left
+  const top = `M${bx},${bt} C${cpx},${bt} ${cpx},${blockEdge.y} ${blockEdge.lx},${blockEdge.y}`;
+  // Bottom edge: target-right → body-bottom (reversed to close shape)
+  const bot = `L${blockEdge.rx},${blockEdge.y} C${cpx},${blockEdge.y} ${cpx},${bb} ${bx},${bb} Z`;
+  return top + ' ' + bot;
+}
+
 // ============================================================
 // CONNECTIONS (SVG)
 // ============================================================
@@ -2131,6 +2615,7 @@ function drawConnections() {
 
   // Define gradient for ribbons
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  // Vertical gradient for top/bottom ribbon wires
   const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
   grad.setAttribute('id', 'ribGrad');
   grad.setAttribute('gradientUnits', 'userSpaceOnUse');
@@ -2143,6 +2628,21 @@ function drawConnections() {
     grad.appendChild(stop);
   });
   defs.appendChild(grad);
+
+  // Horizontal gradient for body-port ribbon wires (gold → cyan → purple)
+  const bodyGrad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+  bodyGrad.setAttribute('id', 'bodyRibGrad');
+  bodyGrad.setAttribute('gradientUnits', 'userSpaceOnUse');
+  bodyGrad.setAttribute('x1', '0'); bodyGrad.setAttribute('y1', '0');
+  bodyGrad.setAttribute('x2', '1'); bodyGrad.setAttribute('y2', '0');
+  [['0%','rgba(255,209,102,0.7)'],['45%','rgba(0,229,255,0.45)'],['100%','rgba(124,92,252,0.5)']].forEach(([offset, color]) => {
+    const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('stop-color', color);
+    bodyGrad.appendChild(stop);
+  });
+  defs.appendChild(bodyGrad);
+
   svg.appendChild(defs);
 
   connections.forEach(({ from, fromPort, to, toPort }, idx) => {
@@ -2168,14 +2668,28 @@ function drawConnections() {
         hitD = `M${p1.x},${p1.y} C${p1.x},${(p1.y+p2.y)/2} ${p2.x},${(p1.y+p2.y)/2} ${p2.x},${p2.y}`;
       }
     } else {
-      // Body port — keep as a single bezier line (sideways)
+      // Body port — wide ribbon fanning from the small body port to the full block edge
+      const isFromBody = fromPort === 'body';
+      const bodyEdge  = getPortEdges(isFromBody ? from : to, 'body');
+      const blockEdge = getPortEdges(isFromBody ? to : from, isFromBody ? (toPort || 'top') : (fromPort || 'top'));
+      if (bodyEdge && blockEdge) {
+        // bodyRibGrad needs accurate x coords for the horizontal gradient
+        const bodyRibGradEl = document.getElementById('bodyRibGrad');
+        if (bodyRibGradEl) {
+          bodyRibGradEl.setAttribute('x1', String(bodyEdge.lx));
+          bodyRibGradEl.setAttribute('x2', String((blockEdge.lx + blockEdge.rx) / 2));
+        }
+        const shapePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shapePath.setAttribute('d', bodyRibbonPath(bodyEdge, blockEdge));
+        shapePath.setAttribute('fill', 'url(#bodyRibGrad)');
+        shapePath.setAttribute('stroke', 'rgba(255,209,102,0.3)');
+        shapePath.setAttribute('stroke-width', '0.5');
+        shapePath.style.pointerEvents = 'none';
+        svg.appendChild(shapePath);
+      }
+      // hit target along spine
       const cx = (p1.x + p2.x) / 2;
       hitD = `M${p1.x},${p1.y} C${cx},${p1.y} ${cx},${p2.y} ${p2.x},${p2.y}`;
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', hitD);
-      path.setAttribute('class', 'conn-line body-line');
-      path.style.pointerEvents = 'none';
-      svg.appendChild(path);
     }
 
     if (hitD) {
@@ -2236,17 +2750,28 @@ function drawConnections() {
         shapePath.style.pointerEvents = 'none';
         svg.appendChild(shapePath);
       } else {
-        // Body port — single line
-        const cx = (p1.x + tx) / 2;
-        const previewLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        previewLine.setAttribute('d', `M${p1.x},${p1.y} C${cx},${p1.y} ${cx},${ty} ${tx},${ty}`);
-        previewLine.setAttribute('stroke', snapping ? 'var(--accent2)' : 'var(--text-dim)');
-        previewLine.setAttribute('stroke-width', snapping ? '2' : '1.5');
-        previewLine.setAttribute('fill', 'none');
-        previewLine.setAttribute('stroke-dasharray', '6 3');
-        previewLine.setAttribute('opacity', snapping ? '1' : '0.4');
-        previewLine.style.pointerEvents = 'none';
-        svg.appendChild(previewLine);
+        // Body port drag — show ribbon preview fanning to snap target or cursor
+        if (e1 && te) {
+          // Snapping to a real port — full ribbon preview
+          const shapePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          shapePath.setAttribute('d', bodyRibbonPath(e1, te));
+          shapePath.setAttribute('fill', snapping ? 'rgba(255,209,102,0.45)' : 'rgba(255,255,255,0.1)');
+          shapePath.setAttribute('stroke', snapping ? 'rgba(255,209,102,0.7)' : 'rgba(255,255,255,0.2)');
+          shapePath.setAttribute('stroke-width', '0.5');
+          shapePath.style.pointerEvents = 'none';
+          svg.appendChild(shapePath);
+        } else if (e1) {
+          // Free-dragging to cursor — fake a narrow target edge at cursor position
+          const T = 20;
+          const fakeEdge = { lx: tx - T / 2, rx: tx + T / 2, y: ty };
+          const shapePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          shapePath.setAttribute('d', bodyRibbonPath(e1, fakeEdge));
+          shapePath.setAttribute('fill', 'rgba(255,209,102,0.12)');
+          shapePath.setAttribute('stroke', 'rgba(255,209,102,0.3)');
+          shapePath.setAttribute('stroke-width', '0.5');
+          shapePath.style.pointerEvents = 'none';
+          svg.appendChild(shapePath);
+        }
       }
     }
   } else if (pendingClick) {
@@ -2269,43 +2794,87 @@ function drawConnections() {
     }
   }
 
-  // Proximity auto-connect ghost while dragging a block
-  if (draggingBlock && proximityTarget) {
-    const fromEdge = getPortEdges(draggingBlock, proximityTarget.fromPort);
-    const toEdge   = getPortEdges(proximityTarget.nodeId, proximityTarget.toPort);
-    if (fromEdge && toEdge) {
-      const ghost = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      ghost.setAttribute('d', ribbonPath(fromEdge, toEdge));
-      ghost.setAttribute('fill', 'rgba(0,229,255,0.25)');
-      ghost.setAttribute('stroke', 'rgba(0,229,255,0.5)');
-      ghost.setAttribute('stroke-width', '0.5');
-      ghost.setAttribute('stroke-dasharray', '6 3');
-      ghost.style.pointerEvents = 'none';
-      svg.appendChild(ghost);
-    }
-  }
+  // (Proximity ghost intentionally removed — auto-connect is disabled to prevent random wires)
+
+  // Sync inactive (disconnected-from-entry) visual state
+  updateInactiveNodes();
 }
 
 // ============================================================
 // CODE GENERATION
 // ============================================================
+function getConnectedSet() {
+  // Returns the set of node IDs reachable from any entry-point node
+  // via any connection (top/bottom/body ports in either direction).
+  const entryIds = blockNodes.filter(n => n.def.isEntryPoint).map(n => n.id);
+  if (entryIds.length === 0) return null; // no entry point — all nodes active (legacy mode)
+
+  // Build adjacency: for each connection, both endpoints are adjacent
+  const adj = {};
+  blockNodes.forEach(n => { adj[n.id] = new Set(); });
+  connections.forEach(c => {
+    if (adj[c.from]) adj[c.from].add(c.to);
+    if (adj[c.to])   adj[c.to].add(c.from);
+  });
+
+  // BFS from all entry points
+  const visited = new Set(entryIds);
+  const queue = [...entryIds];
+  while (queue.length) {
+    const cur = queue.shift();
+    (adj[cur] || new Set()).forEach(nb => {
+      if (!visited.has(nb)) { visited.add(nb); queue.push(nb); }
+    });
+  }
+  return visited;
+}
+
+function updateInactiveNodes() {
+  const active = getConnectedSet();
+  blockNodes.forEach(n => {
+    if (active === null) {
+      n.el.classList.remove('inactive');
+    } else {
+      n.el.classList.toggle('inactive', !active.has(n.id));
+    }
+  });
+}
+
 function generateCode() {
   if (blockNodes.length === 0) return '# Add some blocks to generate code!';
 
-  // Build a set of nodes that are "body children" of a container
-  // body connection: { from: containerId, fromPort: 'body', to: childId, toPort: ... }
-  const bodyChildOf = {}; // childId -> parentId
+  // Work out which nodes are active (reachable from entry point)
+  const activeSet = getConnectedSet();
+
+  // Only collect auto-imports from active nodes
+  const autoImportSet = new Set();
+  blockNodes.forEach(node => {
+    if (activeSet !== null && !activeSet.has(node.id)) return;
+    if (node.def.imports) node.def.imports.forEach(imp => autoImportSet.add(imp));
+  });
+
+  // Build body-child map (only for active nodes)
+  const bodyChildOf = {};
   connections.forEach(c => {
+    if (activeSet && (!activeSet.has(c.from) || !activeSet.has(c.to))) return;
     if (c.fromPort === 'body') bodyChildOf[c.to] = c.from;
     if (c.toPort === 'body')   bodyChildOf[c.from] = c.to;
   });
 
-  // Recursively emit lines for a node and its body children
   function emitNode(node, indent) {
+    // Skip entry-point block itself — it's just a marker, emit nothing
+    if (node.def.isEntryPoint) {
+      // Emit only its body children (things wired to its bottom port)
+      const children = blockNodes
+        .filter(n => bodyChildOf[n.id] === node.id)
+        .sort((a, b) => a.y - b.y);
+      const lines = [];
+      children.forEach(child => lines.push(...emitNode(child, indent)));
+      return lines;
+    }
     const prefix = '    '.repeat(indent);
     const code = node.def.code(node.fields);
     const lines = code.split('\n').map(l => prefix + l);
-    // Find all body children of this node, sorted by Y
     const children = blockNodes
       .filter(n => bodyChildOf[n.id] === node.id)
       .sort((a, b) => a.y - b.y);
@@ -2319,14 +2888,27 @@ function generateCode() {
     return lines;
   }
 
-  // Top-level nodes: not a body-child of anything, sorted by Y
-  const topLevel = blockNodes
+  // Top-level: active, not a body-child, sorted by Y
+  // If there are entry points, only emit nodes reachable from them
+  const activeNodes = activeSet
+    ? blockNodes.filter(n => activeSet.has(n.id))
+    : blockNodes;
+
+  const topLevel = activeNodes
     .filter(n => !bodyChildOf[n.id])
     .sort((a, b) => a.y - b.y);
 
   const allLines = [];
   topLevel.forEach(node => allLines.push(...emitNode(node, 0)));
-  return allLines.join('\n');
+
+  const importLines = [...autoImportSet].sort((a, b) => {
+    const aFrom = a.startsWith('from') ? 1 : 0;
+    const bFrom = b.startsWith('from') ? 1 : 0;
+    return aFrom - bFrom || a.localeCompare(b);
+  });
+  const body = allLines.join('\n');
+  if (importLines.length === 0) return body || '# Add some blocks to generate code!';
+  return importLines.join('\n') + '\n\n' + body;
 }
 
 function syntaxHighlight(code) {
@@ -2376,6 +2958,7 @@ function escHtml(s) {
 }
 
 function updateCodePreview() {
+  updateInactiveNodes();  // keep visual state in sync whenever code regenerates
   const code = generateCode();
   const ta = document.getElementById('codeTextarea');
   const hl = document.getElementById('codeHighlight');
@@ -2557,20 +3140,25 @@ function simulateExecution(lines) {
     }
 
     // Aug assign
-    const augMatch = trimmed.match(/^(\w+)\s*(\+=|-=|\*=|\/=|\/\/=|%=|\*\*=)\s*(.+)$/);
+    const augMatch = trimmed.match(/^(\w+)\s*(\+=|-=|\*\*=|\*=|\/\/=|\/=|%=|&=|\|=|\^=|<<=|>>=)\s*(.+)$/);
     if (augMatch) {
       try {
         const curr = env[augMatch[1]] || 0;
         const rhs = evalExpr(augMatch[3], env);
         let newVal;
         switch(augMatch[2]) {
-          case '+=': newVal = curr + rhs; break;
-          case '-=': newVal = curr - rhs; break;
-          case '*=': newVal = curr * rhs; break;
-          case '/=': newVal = curr / rhs; break;
+          case '+=':  newVal = curr + rhs; break;
+          case '-=':  newVal = curr - rhs; break;
+          case '*=':  newVal = curr * rhs; break;
+          case '/=':  newVal = curr / rhs; break;
           case '//=': newVal = Math.floor(curr / rhs); break;
-          case '%=': newVal = curr % rhs; break;
+          case '%=':  newVal = curr % rhs; break;
           case '**=': newVal = Math.pow(curr, rhs); break;
+          case '&=':  newVal = curr & rhs; break;
+          case '|=':  newVal = curr | rhs; break;
+          case '^=':  newVal = curr ^ rhs; break;
+          case '<<=': newVal = curr << rhs; break;
+          case '>>=': newVal = curr >> rhs; break;
         }
         env[augMatch[1]] = newVal;
         results.push({ type: 'info', text: `→ ${augMatch[1]} = ${newVal}` });
@@ -2704,14 +3292,177 @@ function copyCode() {
 }
 
 function exportCode() {
+  closeFileMenu();
   const code = generateCode();
+  const name = (document.getElementById('projectName').value || 'program').replace(/\.py$/, '');
   const blob = new Blob([code], { type: 'text/plain' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = document.getElementById('projectName').value || 'program.py';
+  a.download = name + '.py';
   a.click();
-  setStatus('Exported!');
+  setStatus('Exported ' + name + '.py');
 }
+
+// ============================================================
+// FILE MENU
+// ============================================================
+function toggleFileMenu() {
+  const dd = document.getElementById('fileDropdown');
+  dd.classList.toggle('open');
+}
+function closeFileMenu() {
+  document.getElementById('fileDropdown').classList.remove('open');
+}
+// Close when clicking outside
+document.addEventListener('mousedown', e => {
+  const menu = document.getElementById('fileMenu');
+  if (menu && !menu.contains(e.target)) closeFileMenu();
+});
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 's') { e.preventDefault(); saveProject(); }
+    if (e.key === 'o') { e.preventDefault(); loadProject(); }
+    if (e.key === 'n') { e.preventDefault(); newProject(); }
+  }
+});
+
+// ── .TPM format: JSON with all canvas state ──────────────────
+let currentFilename = null;
+
+function buildTPM() {
+  return JSON.stringify({
+    version: 1,
+    name: document.getElementById('projectName').value,
+    zoom, panX, panY,
+    nodes: blockNodes.map(n => ({
+      id: n.id, defId: n.defId, x: n.x, y: n.y, fields: { ...n.fields }
+    })),
+    connections: connections.map(c => ({ ...c })),
+  }, null, 2);
+}
+
+function saveProject() {
+  closeFileMenu();
+  const tpm = buildTPM();
+  const name = (document.getElementById('projectName').value || 'project');
+  const blob = new Blob([tpm], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.tpm';
+  a.click();
+  currentFilename = name;
+  setStatus('Saved ' + name + '.tpm');
+}
+
+function saveProjectAs() {
+  closeFileMenu();
+  saveProject();
+}
+
+function loadProject() {
+  closeFileMenu();
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.tpm,application/json';
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        applyTPM(data);
+        setStatus('Opened ' + file.name);
+      } catch(err) {
+        setStatus('Error: invalid .tpm file');
+      }
+    };
+    reader.readAsText(file);
+  });
+  input.click();
+}
+
+function applyTPM(data) {
+  // Clear current state
+  blockNodes.forEach(n => n.el.remove());
+  blockNodes = []; connections = []; selectedBlock = null;
+  document.getElementById('svgLayer').innerHTML = '';
+
+  // Restore meta
+  if (data.name) document.getElementById('projectName').value = data.name;
+  if (data.zoom !== undefined) { zoom = data.zoom; panX = data.panX; panY = data.panY; }
+
+  // Restore nodes — keep original IDs
+  const usedIds = new Set();
+  (data.nodes || []).forEach(nd => {
+    addBlock(nd.defId, nd.x, nd.y);
+    const node = blockNodes[blockNodes.length - 1];
+    // Rename the element/node to original ID
+    node.el.id = nd.id;
+    node.id = nd.id;
+    Object.assign(node.fields, nd.fields);
+    // Sync inputs to restored fields
+    const inputs = node.el.querySelectorAll('input, select');
+    node.def.fields.forEach((fd, fi) => {
+      if (inputs[fi] && nd.fields[fd.name] !== undefined)
+        inputs[fi].value = nd.fields[fd.name];
+    });
+    usedIds.add(nd.id);
+  });
+
+  // Restore connections
+  connections = (data.connections || []).slice();
+
+  applyTransform();
+  updateHint();
+  drawConnections();
+  updateCodePreview();
+  updateStatus();
+  updateVars();
+}
+
+function newProject() {
+  closeFileMenu();
+  if (blockNodes.length > 0 && !confirm('Start a new project? Unsaved changes will be lost.')) return;
+  blockNodes.forEach(n => n.el.remove());
+  blockNodes = []; connections = []; selectedBlock = null;
+  document.getElementById('svgLayer').innerHTML = '';
+  document.getElementById('projectName').value = 'my_project';
+  zoom = 1; panX = 40; panY = 40;
+  applyTransform();
+  updateHint(); updateCodePreview(); updateStatus(); updateVars();
+  setStatus('New project');
+}
+
+// ============================================================
+// HOVER-TO-FOCUS TEXT INPUTS
+// ============================================================
+// When the mouse enters an editable input/select inside a block,
+// focus it so the keyboard immediately works without clicking.
+// When the mouse leaves the focused element, blur it.
+document.addEventListener('mouseover', e => {
+  const el = e.target;
+  if (!el) return;
+  // Only target inputs/selects that live inside a block node
+  if ((el.tagName === 'INPUT' && el.type === 'text') || el.tagName === 'SELECT') {
+    if (el.closest('.block-node') || el.closest('.block-field')) {
+      el.focus();
+    }
+  }
+}, true);
+
+document.addEventListener('mouseout', e => {
+  const el = e.target;
+  if (!el) return;
+  if ((el.tagName === 'INPUT' && el.type === 'text') || el.tagName === 'SELECT') {
+    if (document.activeElement === el) {
+      el.blur();
+    }
+  }
+}, true);
 
 // ============================================================
 // EXAMPLES
@@ -2965,12 +3716,10 @@ function matchLineToBlock(raw) {
   // Comment
   if (t.startsWith('#')) return { defId: 'comment', fields: { text: t.slice(1).trim() } };
 
-  // import math / import random / import X as Y / import X
-  if (/^import\s+math\s*$/.test(t)) return { defId: 'importmath', fields: {} };
-  if (/^import\s+random\s*$/.test(t)) return { defId: 'importrandom', fields: {} };
+  // Skip ALL import lines — handled by auto-import system
+  if (/^import\s+/.test(t) || /^from\s+\S+\s+import\s+/.test(t)) return null;
+
   let m;
-  m = t.match(/^import\s+(\w+)(?:\s+as\s+(\w+))?\s*$/);
-  if (m) return { defId: 'import', fields: { module: m[1], alias: m[2] || '' } };
 
   // for X in Y:
   m = t.match(/^for\s+(\w+)\s+in\s+(.+?)\s*:\s*$/);
@@ -2987,7 +3736,7 @@ function matchLineToBlock(raw) {
 
   // def NAME(ARGS):
   m = t.match(/^def\s+(\w+)\s*\(([^)]*)\)\s*:\s*$/);
-  if (m) return { defId: 'defn', fields: { name: m[1], args: m[2] } };
+  if (m) return { defId: 'defn', fields: { name: m[1], args: m[2].trim() } };
 
   // return VALUE
   m = t.match(/^return\s+(.*)/);
@@ -3015,7 +3764,7 @@ function matchLineToBlock(raw) {
   if (m) return { defId: 'random', fields: { var: m[1], lo: m[2].trim(), hi: m[3].trim() } };
 
   // VAR = f"TMPL" or VAR = f'TMPL'
-  m = t.match(/^(\w+)\s*=\s*f["'](.*)["']\s*$/);
+  m = t.match(/^(\w+)\s*=\s*f["'](.*)['"]\s*$/);
   if (m) return { defId: 'fstring', fields: { var: m[1], tmpl: m[2] } };
 
   // RESULT = TMPL.format(ARGS)
@@ -3059,38 +3808,37 @@ function matchLineToBlock(raw) {
   if (/^break\s*$/.test(t)) return { defId: 'break', fields: {} };
   if (/^continue\s*$/.test(t)) return { defId: 'continue', fields: {} };
 
-  // RESULT = NAME(ARGS)  — function call
-  m = t.match(/^(\w+)\s*=\s*(\w+)\s*\(([^)]*)\)\s*$/);
+  // X op= val — MUST come before generic = catch-all
+  m = t.match(/^(\w+)\s*(\+=|-=|\*\*=|\*=|\/\/=|\/=|%=|&=|\|=|\^=|<<=|>>=)\s*(.+)$/);
+  if (m) {
+    const op = m[2], rhs3 = m[3].trim();
+    if (rhs3.includes('math.') || /[+\-*/%()]/.test(rhs3)) {
+      return { defId: 'mathexpr', fields: { result: m[1], op, expr: rhs3 } };
+    }
+    return { defId: 'augassign', fields: { name: m[1], op, value: rhs3 } };
+  }
+
+  // VAR = NAME(ARGS)  — function call (before generic = )
+  m = t.match(/^(\w+)\s*=\s*(\w[\w.]*)\s*\(([^)]*)\)\s*$/);
   if (m) return { defId: 'call', fields: { result: m[1], name: m[2], args: m[3] } };
 
   // VAR = lambda ARGS: EXPR
   m = t.match(/^(\w+)\s*=\s*lambda\s+([^:]+):\s*(.+)$/);
   if (m) return { defId: 'lambda', fields: { var: m[1], args: m[2].trim(), expr: m[3].trim() } };
 
-  // RESULT = MATH_EXPR  — math or generic expression
+  // VAR = EXPR — generic (math or assign)
   m = t.match(/^(\w+)\s*=\s*(.+)$/);
   if (m) {
     const rhs = m[2].trim();
-    // Try to detect aug-assign patterns represented as X = X OP val — skip, handled below
-    // Check for math functions
     if (rhs.includes('math.') || /[+\-*/%()]/.test(rhs)) {
-      return { defId: 'mathexpr', fields: { result: m[1], expr: rhs } };
+      return { defId: 'mathexpr', fields: { result: m[1], op: '=', expr: rhs } };
     }
     return { defId: 'assign', fields: { name: m[1], value: rhs } };
   }
 
-  // X += / -= / etc.
-  m = t.match(/^(\w+)\s*(\+=|-=|\*=|\/=|\/\/=|%=|\*\*=)\s*(.+)$/);
-  if (m) return { defId: 'augassign', fields: { name: m[1], op: m[2], value: m[3].trim() } };
-
-  // with open(FILE, 'w') as f: f.write(CONTENT) — inline write
-  m = t.match(/^with\s+open\s*\((.+?),\s*'w'\)\s+as\s+\w+:\s*$/);
-  if (m) return { defId: 'filewrite', fields: { file: m[1].trim(), content: '""' } };
-
   // Fallback — treat as comment so nothing is lost
   return { defId: 'comment', fields: { text: t } };
 }
-
 function parseCodeToCanvas() {
   const ta = document.getElementById('codeTextarea');
   if (!ta) return;
@@ -3242,64 +3990,83 @@ function updateProximity(draggingId) {
 }
 
 function commitProximityConnect(draggingId) {
-  if (!proximityTarget) return;
-  const tn = blockNodes.find(b => b.id === proximityTarget.nodeId);
+  // Proximity auto-connect is intentionally disabled to prevent random connections.
+  // Connections are only made via explicit port drag or click-to-connect.
+  const tn = proximityTarget ? blockNodes.find(b => b.id === proximityTarget.nodeId) : null;
   if (tn) tn.el.classList.remove('proximity-snap');
-  makeConnection(draggingId, proximityTarget.fromPort, proximityTarget.nodeId, proximityTarget.toPort);
   proximityTarget = null;
   drawConnections();
-  updateCodePreview();
 }
 
 // ============================================================
 // Q MENU
 // ============================================================
 let qMenuOpen = false;
+let qActiveLib = 'basic';
 let qActiveCat = null;
-let qDraggingDefId = null; // block being dragged out of Q menu
+let qDraggingDefId = null;
 
 function buildQMenu() {
-  const cats = document.getElementById('qMenuCats');
-  const subcats = document.getElementById('qMenuSubcats');
-  cats.innerHTML = ''; subcats.innerHTML = '';
-
-  const catList = Object.keys(CAT_META);
-  catList.forEach((cat, i) => {
+  // ── Top tabs: one per LIB_META entry ──
+  const topTabs = document.getElementById('qMenuCats');
+  topTabs.innerHTML = '';
+  Object.entries(LIB_META).forEach(([libId, lib]) => {
     const tab = document.createElement('div');
-    tab.className = 'q-cat-tab' + (i === 0 ? ' active' : '');
-    tab.textContent = CAT_META[cat].label;
-    tab.style.color = i === 0 ? CAT_META[cat].color : '';
-    tab.dataset.cat = cat;
-    tab.addEventListener('mousedown', e => { e.stopPropagation(); selectQCat(cat); });
-    cats.appendChild(tab);
-
-    const sub = document.createElement('div');
-    sub.className = 'q-subcat' + (i === 0 ? ' active' : '');
-    sub.textContent = CAT_META[cat].label;
-    sub.style.borderLeftColor = i === 0 ? CAT_META[cat].color : 'transparent';
-    sub.dataset.cat = cat;
-    sub.addEventListener('mousedown', e => { e.stopPropagation(); selectQCat(cat); });
-    subcats.appendChild(sub);
+    tab.className = 'q-cat-tab' + (libId === qActiveLib ? ' active' : '');
+    tab.textContent = lib.label;
+    tab.dataset.lib = libId;
+    if (libId === qActiveLib) tab.style.color = lib.color;
+    tab.addEventListener('mousedown', e => { e.stopPropagation(); selectQLib(libId); });
+    topTabs.appendChild(tab);
   });
 
-  selectQCat(catList[0]);
+  // ── Left list: subcategories of active lib ──
+  selectQLib(qActiveLib, true);
+}
+
+function selectQLib(libId, keepCat) {
+  qActiveLib = libId;
+  const lib = LIB_META[libId];
+
+  // Update top tab highlights
+  document.querySelectorAll('.q-cat-tab').forEach(t => {
+    const active = t.dataset.lib === libId;
+    t.classList.toggle('active', active);
+    t.style.color = active ? LIB_META[libId].color : '';
+  });
+
+  // Rebuild left subcategory list
+  const subcats = document.getElementById('qMenuSubcats');
+  subcats.innerHTML = '';
+  lib.cats.forEach((catId, i) => {
+    const meta = CAT_META[catId];
+    if (!meta) return;
+    const el = document.createElement('div');
+    el.className = 'q-subcat';
+    el.textContent = meta.label;
+    el.dataset.cat = catId;
+    el.addEventListener('mousedown', e => { e.stopPropagation(); selectQCat(catId); });
+    subcats.appendChild(el);
+  });
+
+  // Select first cat of this lib unless keepCat and current cat is in this lib
+  const cats = lib.cats;
+  const targetCat = (keepCat && cats.includes(qActiveCat)) ? qActiveCat : cats[0];
+  selectQCat(targetCat);
 }
 
 function selectQCat(cat) {
   qActiveCat = cat;
-  // Update tab + subcat active states
-  document.querySelectorAll('.q-cat-tab').forEach(t => {
-    const active = t.dataset.cat === cat;
-    t.classList.toggle('active', active);
-    t.style.color = active ? CAT_META[cat].color : '';
-  });
+  const meta = CAT_META[cat];
+
+  // Update subcat highlights
   document.querySelectorAll('.q-subcat').forEach(s => {
     const active = s.dataset.cat === cat;
     s.classList.toggle('active', active);
-    s.style.borderLeftColor = active ? CAT_META[s.dataset.cat].color : 'transparent';
+    s.style.borderLeftColor = active ? (meta ? meta.color : 'var(--accent2)') : 'transparent';
   });
 
-  // Render grid
+  // Render block grid for this cat
   const grid = document.getElementById('qMenuGrid');
   grid.innerHTML = '';
   BLOCK_DEFS.filter(b => b.cat === cat).forEach(def => {
@@ -3307,7 +4074,6 @@ function selectQCat(cat) {
     card.className = 'q-block-card';
     card.style.borderTopColor = def.color;
 
-    // Render actual block header + body preview
     const fakeFields = {};
     def.fields.forEach(f => fakeFields[f.name] = f.default);
 
@@ -3315,19 +4081,30 @@ function selectQCat(cat) {
     hdr.className = 'block-header';
     hdr.style.background = def.color + 'cc';
     hdr.innerHTML = `<span class="bh-icon">${def.icon}</span><span class="bh-label">${def.label}</span>`;
+    if (def.imports && def.imports.length) {
+      hdr.title = 'Auto-imports: ' + def.imports.join(', ');
+    }
 
     const bod = document.createElement('div');
     bod.className = 'block-body';
     bod.style.fontSize = '11px';
     if (def.fields.length) {
-      def.fields.forEach(f => {
+      def.fields.slice(0, 3).forEach(f => {  // show max 3 fields in preview
         const row = document.createElement('div');
         row.className = 'block-field';
         row.innerHTML = `<label>${f.label}</label><span style="flex:1;background:var(--surface3);border-radius:4px;padding:3px 6px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.default}</span>`;
         bod.appendChild(row);
       });
     } else {
-      bod.innerHTML = `<span style="font-size:10px;color:var(--text-dim);font-family:JetBrains Mono,monospace;">${def.code(fakeFields)}</span>`;
+      bod.innerHTML = `<span style="font-size:10px;color:var(--text-dim);font-family:JetBrains Mono,monospace;">${escHtml(def.code(fakeFields))}</span>`;
+    }
+
+    // Auto-import badge
+    if (def.imports && def.imports.length) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'padding:3px 8px 5px;font-size:9px;color:var(--accent5);font-family:JetBrains Mono,monospace;opacity:0.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      badge.textContent = '⚡ ' + def.imports[0];
+      bod.appendChild(badge);
     }
 
     card.appendChild(hdr);
@@ -3336,7 +4113,6 @@ function selectQCat(cat) {
     card.addEventListener('mousedown', e => {
       e.preventDefault(); e.stopPropagation();
       qDraggingDefId = def.id;
-      // Start a real block drag — place block at cursor, then let normal drag take over
       const r = canvasWrap.getBoundingClientRect();
       const x = (e.clientX - r.left - panX) / zoom - 90;
       const y = (e.clientY - r.top  - panY) / zoom - 30;
