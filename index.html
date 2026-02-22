@@ -197,13 +197,18 @@
       linear-gradient(rgba(42,47,90,0.3) 1px, transparent 1px),
       linear-gradient(90deg, rgba(42,47,90,0.3) 1px, transparent 1px);
     background-size: 100% 100%, 30px 30px, 30px 30px;
+    cursor: grab;
   }
+  .canvas-wrap:active { cursor: grabbing; }
 
   .canvas {
     position: absolute;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+    top: 0; left: 0;
+    min-width: 100%;
+    min-height: 100%;
+    overflow: visible;
+    transform-origin: 0 0;
+    will-change: transform;
   }
 
   .canvas-hint {
@@ -290,23 +295,46 @@
   }
   .block-field input:focus, .block-field select:focus { border-color: var(--accent); }
 
-  /* connector ports */
+  /* connector ports — full-width ribbon connectors */
   .block-connector {
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 12px;
+    left: -1px;
+    right: -1px;
+    width: auto;
+    transform: none;
     height: 12px;
-    border-radius: 50%;
-    background: var(--surface3);
-    border: 2px solid var(--border);
-    cursor: pointer;
-    transition: all 0.15s;
-    z-index: 5;
+    border-radius: 3px 3px 0 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%);
+    border: 1.5px solid var(--border);
+    cursor: grab;
+    transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
-  .block-connector:hover { border-color: var(--accent2); background: var(--accent2); transform: translateX(-50%) scale(1.3); }
-  .block-connector.top { top: -6px; }
-  .block-connector.bottom { bottom: -6px; }
+  /* grip lines */
+  .block-connector::before,
+  .block-connector::after {
+    content: '';
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(255,255,255,0.15);
+    flex-shrink: 0;
+  }
+  .block-connector:hover {
+    border-color: var(--accent2);
+    background: linear-gradient(180deg, rgba(0,229,255,0.2) 0%, rgba(0,229,255,0.06) 100%);
+    box-shadow: 0 0 10px rgba(0,229,255,0.35);
+    cursor: grab;
+  }
+  .block-connector:hover::before,
+  .block-connector:hover::after { background: rgba(0,229,255,0.5); }
+  .block-connector.top    { top: -13px; border-radius: 3px 3px 0 0; }
+  .block-connector.bottom { bottom: -13px; border-radius: 0 0 3px 3px; }
 
   /* Body port — right side of container blocks */
   .block-connector.body-port {
@@ -350,9 +378,15 @@
   svg.connections {
     position: absolute;
     top: 0; left: 0;
-    width: 100%; height: 100%;
+    width: 8000px;
+    height: 8000px;
     pointer-events: none;
     z-index: 5;
+    overflow: visible;
+  }
+  svg.connections .wire-hit {
+    pointer-events: stroke;
+    cursor: pointer;
   }
   .conn-line {
     stroke: var(--accent);
@@ -655,13 +689,29 @@
   .canvas-wrap.wiring .block-node { cursor: crosshair; }
   .canvas-wrap.wiring .block-header { cursor: crosshair; }
 
-  /* Selected port (first click) */
+  /* Selected port (drag start or first click) */
   .block-connector.port-selected {
     border-color: var(--accent2) !important;
-    background: var(--accent2) !important;
-    transform: translateX(-50%) scale(1.5) !important;
-    box-shadow: 0 0 0 3px rgba(0,229,255,0.3), 0 0 12px var(--accent2);
+    background: linear-gradient(180deg, rgba(0,229,255,0.35) 0%, rgba(0,229,255,0.12) 100%) !important;
+    box-shadow: 0 0 12px rgba(0,229,255,0.5) !important;
     animation: portPulse 0.9s ease-in-out infinite;
+  }
+  .block-connector.port-selected::before,
+  .block-connector.port-selected::after { background: rgba(0,229,255,0.7); }
+  /* Snap target highlight */
+  .block-connector.snap-highlight {
+    border-color: var(--accent2) !important;
+    background: linear-gradient(180deg, rgba(0,229,255,0.45) 0%, rgba(0,229,255,0.18) 100%) !important;
+    box-shadow: 0 0 18px rgba(0,229,255,0.65) !important;
+    animation: snapPulse 0.35s ease-in-out infinite alternate;
+  }
+  .block-connector.snap-highlight::before,
+  .block-connector.snap-highlight::after { background: var(--accent2); }
+  .block-connector.body-port.port-selected  { transform: translateY(-50%) scale(1.2) !important; }
+  .block-connector.body-port.snap-highlight { transform: translateY(-50%) scale(1.35) !important; }
+  @keyframes snapPulse {
+    from { box-shadow: 0 0 8px rgba(0,229,255,0.3); }
+    to   { box-shadow: 0 0 22px rgba(0,229,255,0.7); }
   }
   @keyframes portPulse {
     0%, 100% { box-shadow: 0 0 0 3px rgba(0,229,255,0.3), 0 0 12px var(--accent2); }
@@ -946,6 +996,95 @@
     gap: 8px;
     border-left: 3px solid transparent;
   }
+  /* ---- Q MENU ---- */
+  .q-menu {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,12,20,0.88);
+    backdrop-filter: blur(6px);
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Rubik', sans-serif;
+  }
+  .q-menu-cats {
+    display: flex;
+    gap: 2px;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .q-cat-tab {
+    padding: 7px 16px;
+    border-radius: 6px 6px 0 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    color: var(--text-dim);
+    border: 1px solid transparent;
+    border-bottom: none;
+    user-select: none;
+  }
+  .q-cat-tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .q-cat-tab.active { color: var(--text); background: var(--surface2); border-color: var(--border); }
+  .q-menu-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .q-menu-subcats {
+    width: 160px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 10px 0;
+    overflow-y: auto;
+  }
+  .q-subcat {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-dim);
+    border-left: 3px solid transparent;
+    user-select: none;
+  }
+  .q-subcat:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .q-subcat.active { color: var(--text); border-left-color: var(--accent2); background: rgba(0,229,255,0.06); }
+  .q-menu-grid {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+    align-content: start;
+  }
+  .q-block-card {
+    background: var(--surface2);
+    border-radius: 10px;
+    border-top: 3px solid transparent;
+    cursor: grab;
+    user-select: none;
+    overflow: hidden;
+  }
+  .q-block-card:hover { box-shadow: 0 0 0 1px rgba(255,255,255,0.12); }
+  .q-block-card:active { cursor: grabbing; }
+  .q-block-card .block-header { border-radius: 7px 7px 0 0; pointer-events: none; }
+  .q-block-card .block-body   { pointer-events: none; }
+  .q-block-card .block-connector { display: none; }
+  .q-menu-hint {
+    text-align: center;
+    padding: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  /* proximity auto-connect highlight */
+  .block-node.proximity-snap { outline: 2px solid var(--accent2); outline-offset: 3px; box-shadow: 0 0 20px rgba(0,229,255,0.35); }
+
 </style>
 </head>
 <body>
@@ -1130,6 +1269,16 @@
     <button class="btn btn-secondary" onclick="closePrompt()">Cancel</button>
     <button class="btn btn-primary" onclick="confirmPrompt()">OK</button>
   </div>
+</div>
+
+<!-- Q MENU OVERLAY -->
+<div id="qMenu" class="q-menu" style="display:none;">
+  <div class="q-menu-cats" id="qMenuCats"></div>
+  <div class="q-menu-body">
+    <div class="q-menu-subcats" id="qMenuSubcats"></div>
+    <div class="q-menu-grid" id="qMenuGrid"></div>
+  </div>
+  <div class="q-menu-hint">Hold Q · release to close · drag block to canvas</div>
 </div>
 
 <script>
@@ -1417,17 +1566,16 @@ function addBlock(defId, x, y) {
     body.appendChild(row);
   });
 
-  // Connectors — click-to-connect system
+  // Connectors — drag-wire OR click-to-connect
   const connTop = document.createElement('div');
   connTop.className = 'block-connector top';
-  connTop.title = 'Click to connect';
+  connTop.title = 'Drag or click to wire';
   const connBot = document.createElement('div');
   connBot.className = 'block-connector bottom';
-  connBot.title = 'Click to connect';
+  connBot.title = 'Drag or click to wire';
 
   const ports = [connTop, connBot];
 
-  // Body port (right side) for container blocks
   let connBody = null;
   if (def.hasBody) {
     connBody = document.createElement('div');
@@ -1438,18 +1586,20 @@ function addBlock(defId, x, y) {
   }
 
   ports.forEach(port => {
-    let portType;
-    if (port === connTop) portType = 'top';
-    else if (port === connBot) portType = 'bottom';
-    else portType = 'body';
+    const portType = port === connTop ? 'top' : port === connBot ? 'bottom' : 'body';
 
-    const handler = e => {
-      e.stopPropagation();
-      e.preventDefault();
-      handlePortClick(id, portType);
-    };
-    port.addEventListener('click', handler);
-    port.addEventListener('touchend', handler, { passive: false });
+    // Mouse
+    port.addEventListener('mousedown', e => {
+      e.stopPropagation(); e.preventDefault();
+      startPortDrag(id, portType, e.clientX, e.clientY);
+    });
+
+    // Touch
+    port.addEventListener('touchstart', e => {
+      e.stopPropagation(); e.preventDefault();
+      const t = e.touches[0];
+      startPortDrag(id, portType, t.clientX, t.clientY);
+    }, { passive: false });
   });
 
   el.appendChild(connTop);
@@ -1463,11 +1613,13 @@ function addBlock(defId, x, y) {
   header.addEventListener('mousedown', e => {
     if (e.target.classList.contains('block-close')) return;
     e.preventDefault();
+    e.stopPropagation();
     draggingBlock = id;
     selectBlock(id);
-    const rect = el.getBoundingClientRect();
-    dragOffset.x = e.clientX - rect.left;
-    dragOffset.y = e.clientY - rect.top;
+    // dragOffset in canvas-local units: cursor position minus node top-left
+    const rect = canvasWrap.getBoundingClientRect();
+    dragOffset.x = (e.clientX - rect.left - panX) / zoom - node_ref.x;
+    dragOffset.y = (e.clientY - rect.top  - panY) / zoom - node_ref.y;
     el.classList.add('dragging');
   });
 
@@ -1475,21 +1627,20 @@ function addBlock(defId, x, y) {
   header.addEventListener('touchstart', e => {
     if (e.target.classList.contains('block-close')) return;
     e.preventDefault();
+    e.stopPropagation();
     const touch = e.touches[0];
     draggingBlock = id;
     selectBlock(id);
-    const rect = el.getBoundingClientRect();
-    dragOffset.x = touch.clientX - rect.left;
-    dragOffset.y = touch.clientY - rect.top;
+    const rect = canvasWrap.getBoundingClientRect();
+    dragOffset.x = (touch.clientX - rect.left - panX) / zoom - node_ref.x;
+    dragOffset.y = (touch.clientY - rect.top  - panY) / zoom - node_ref.y;
     el.classList.add('dragging');
   }, { passive: false });
 
-  el.addEventListener('mousedown', e => {
-    selectBlock(id);
-  });
+  el.addEventListener('mousedown', e => { selectBlock(id); });
 
-  const node = { id, defId, x, y, fields, el, def };
-  blockNodes.push(node);
+  const node_ref = { id, defId, x, y, fields, el, def };
+  blockNodes.push(node_ref);
 
   updateHint();
   updateCodePreview();
@@ -1521,66 +1672,229 @@ function selectBlock(id) {
 }
 
 // ============================================================
-// WIRE CONNECTING (click-to-connect, port-aware, toggle-to-disconnect)
+// WIRE DRAG SYSTEM — drag-wire with snap-to-nearest + click fallback
 // ============================================================
-let wiringState = { active: false, fromId: null, fromPort: null };
+const DRAG_THRESHOLD = 8; // px screen-space before entering drag mode
 
-function handlePortClick(nodeId, portType) {
-  if (!wiringState.active) {
-    // First click — select this port as source
-    wiringState = { active: true, fromId: nodeId, fromPort: portType };
+// Check if a target port is valid: different node, not already connected on that port
+function isCompatiblePort(fromId, fromPort, toId, toPort) {
+  if (fromId === toId) return false;
+  const taken = connections.some(c =>
+    (c.from === toId && c.fromPort === toPort) ||
+    (c.to   === toId && c.toPort   === toPort)
+  );
+  return !taken;
+}
+
+// All valid target ports in canvas-local coords
+function getAllPortPositions(fromId, fromPort) {
+  const result = [];
+  blockNodes.forEach(n => {
+    ['top', 'bottom', ...(n.def.hasBody ? ['body'] : [])].forEach(pt => {
+      if (!isCompatiblePort(fromId, fromPort, n.id, pt)) return;
+      const p = getPortCenter(n.id, pt);
+      if (p) result.push({ nodeId: n.id, portType: pt, cx: p.x, cy: p.y });
+    });
+  });
+  return result;
+}
+
+// Find nearest valid port -- no distance limit, always snaps to something
+function findSnapTarget(canvasX, canvasY, fromId, fromPort) {
+  const candidates = getAllPortPositions(fromId, fromPort);
+  let best = null, bestDist = Infinity;
+  candidates.forEach(c => {
+    const d = Math.hypot(c.cx - canvasX, c.cy - canvasY);
+    if (d < bestDist) { bestDist = d; best = c; }
+  });
+  return best;
+}
+
+// wireDrag state object
+let wireDrag = {
+  active:    false,
+  dragging:  false,
+  fromId:    null,
+  fromPort:  null,
+  startX:    0, startY: 0,
+  curX:      0, curY:   0,
+  snapTarget: null,
+};
+
+function startPortDrag(nodeId, portType, screenX, screenY) {
+  wireDrag = {
+    active: true, dragging: false,
+    fromId: nodeId, fromPort: portType,
+    startX: screenX, startY: screenY,
+    curX: screenX, curY: screenY,
+    snapTarget: null,
+  };
+  // Highlight source port
+  const node = blockNodes.find(b => b.id === nodeId);
+  if (node) {
+    node.el.querySelectorAll('.block-connector').forEach(p => {
+      const pt = p.classList.contains('top') ? 'top' : p.classList.contains('bottom') ? 'bottom' : 'body';
+      if (pt === portType) p.classList.add('port-selected');
+    });
+  }
+  drawConnections();
+}
+
+function updatePortDrag(screenX, screenY) {
+  if (!wireDrag.active) return;
+  wireDrag.curX = screenX;
+  wireDrag.curY = screenY;
+
+  const dx = screenX - wireDrag.startX;
+  const dy = screenY - wireDrag.startY;
+  if (!wireDrag.dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+    wireDrag.dragging = true;
     canvasWrap.classList.add('wiring');
-    // Highlight the selected port element
-    const node = blockNodes.find(b => b.id === nodeId);
-    if (node) {
-      node.el.querySelectorAll('.block-connector').forEach(p => {
-        const pType = p.classList.contains('top') ? 'top' : p.classList.contains('bottom') ? 'bottom' : 'body';
-        if (pType === portType) p.classList.add('port-selected');
-      });
-    }
     showWireCancel();
-    drawConnections();
-  } else {
-    // Second click
-    if (wiringState.fromId === nodeId) {
-      // Clicked same node — cancel
-      cancelWireConnect();
-      return;
-    }
-    const { fromId, fromPort } = wiringState;
-    cancelWireConnect();
+  }
 
-    // Check if this exact connection already exists — if so, remove it (toggle)
-    const existingIdx = connections.findIndex(c =>
-      (c.from === fromId && c.fromPort === fromPort && c.to === nodeId && c.toPort === portType) ||
-      (c.from === nodeId && c.fromPort === portType && c.to === fromId && c.toPort === fromPort)
-    );
-    if (existingIdx !== -1) {
-      connections.splice(existingIdx, 1);
-      drawConnections();
-      updateCodePreview();
-      setStatus('Wire removed');
-    } else {
-      // Remove any prior connection on same port pair (one connection per port combo)
-      connections = connections.filter(c =>
-        !(c.from === fromId && c.fromPort === fromPort) &&
-        !(c.to === fromId && c.toPort === fromPort)
-      );
-      connections.push({ from: fromId, fromPort, to: nodeId, toPort: portType });
-      drawConnections();
-      updateCodePreview();
-      setStatus('Connected!');
+  if (wireDrag.dragging) {
+    // Convert cursor to canvas-local
+    const r = canvasWrap.getBoundingClientRect();
+    const cx = (screenX - r.left - panX) / zoom;
+    const cy = (screenY - r.top  - panY) / zoom;
+    wireDrag.snapTarget = findSnapTarget(cx, cy, wireDrag.fromId, wireDrag.fromPort);
+    // Highlight snap target
+    document.querySelectorAll('.block-connector.snap-highlight')
+      .forEach(p => p.classList.remove('snap-highlight'));
+    if (wireDrag.snapTarget) {
+      const tn = blockNodes.find(b => b.id === wireDrag.snapTarget.nodeId);
+      if (tn) {
+        tn.el.querySelectorAll('.block-connector').forEach(p => {
+          const pt = p.classList.contains('top') ? 'top' : p.classList.contains('bottom') ? 'bottom' : 'body';
+          if (pt === wireDrag.snapTarget.portType) p.classList.add('snap-highlight');
+        });
+      }
     }
+    drawConnections();
   }
 }
 
-function cancelWireConnect() {
-  wiringState = { active: false, fromId: null, fromPort: null };
+function commitPortDrag(screenX, screenY) {
+  if (!wireDrag.active) return;
+  const { fromId, fromPort, dragging, snapTarget } = wireDrag;
+
+  // Clear highlights
+  document.querySelectorAll('.block-connector.port-selected, .block-connector.snap-highlight')
+    .forEach(p => { p.classList.remove('port-selected'); p.classList.remove('snap-highlight'); });
   canvasWrap.classList.remove('wiring');
+  hideWireCancel();
+  wireDrag = { active: false, dragging: false, fromId: null, fromPort: null, startX:0, startY:0, curX:0, curY:0, snapTarget: null };
+
+  if (!dragging) {
+    // Short release = click fallback (toggle)
+    handlePortClick_commit(fromId, fromPort);
+    drawConnections();
+    return;
+  }
+
+  // Dragged — connect to snap target if any
+  if (snapTarget) {
+    makeConnection(fromId, fromPort, snapTarget.nodeId, snapTarget.portType);
+  } else {
+    setStatus('No port nearby — wire dropped');
+  }
+  drawConnections();
+}
+
+function cancelPortDrag() {
+  document.querySelectorAll('.block-connector.port-selected, .block-connector.snap-highlight')
+    .forEach(p => { p.classList.remove('port-selected'); p.classList.remove('snap-highlight'); });
+  canvasWrap.classList.remove('wiring');
+  hideWireCancel();
+  wireDrag = { active: false, dragging: false, fromId: null, fromPort: null, startX:0, startY:0, curX:0, curY:0, snapTarget: null };
+  drawConnections();
+}
+
+// Click fallback — handles the two-click toggle behaviour
+let pendingClick = null;  // { fromId, fromPort }
+
+function handlePortClick_commit(nodeId, portType) {
+  if (!pendingClick) {
+    pendingClick = { fromId: nodeId, fromPort: portType };
+    // Highlight
+    const node = blockNodes.find(b => b.id === nodeId);
+    if (node) {
+      node.el.querySelectorAll('.block-connector').forEach(p => {
+        const pt = p.classList.contains('top') ? 'top' : p.classList.contains('bottom') ? 'bottom' : 'body';
+        if (pt === portType) p.classList.add('port-selected');
+      });
+    }
+    canvasWrap.classList.add('wiring');
+    showWireCancel();
+  } else {
+    const { fromId, fromPort } = pendingClick;
+    pendingClick = null;
+    canvasWrap.classList.remove('wiring');
+    hideWireCancel();
+    document.querySelectorAll('.block-connector.port-selected').forEach(p => p.classList.remove('port-selected'));
+    if (fromId === nodeId) return; // same node — cancel
+    makeConnection(fromId, fromPort, nodeId, portType);
+  }
+}
+
+function makeConnection(fromId, fromPort, toId, toPort) {
+  // Toggle if exact same connection exists
+  const existingIdx = connections.findIndex(c =>
+    (c.from === fromId && c.fromPort === fromPort && c.to === toId   && c.toPort === toPort) ||
+    (c.from === toId   && c.fromPort === toPort   && c.to === fromId && c.toPort === fromPort)
+  );
+  if (existingIdx !== -1) {
+    connections.splice(existingIdx, 1);
+    updateCodePreview();
+    setStatus('Wire removed');
+    return;
+  }
+  // Remove prior connections on the same ports
+  connections = connections.filter(c =>
+    !(c.from === fromId && c.fromPort === fromPort) &&
+    !(c.to   === fromId && c.toPort   === fromPort)
+  );
+  connections.push({ from: fromId, fromPort, to: toId, toPort });
+  updateCodePreview();
+  setStatus('Connected!');
+}
+
+// Cancel button — works for both drag-wire and click-pending states
+function cancelWireConnect() {
+  cancelPortDrag();
+  pendingClick = null;
   document.querySelectorAll('.block-connector.port-selected').forEach(p => p.classList.remove('port-selected'));
+  canvasWrap.classList.remove('wiring');
   hideWireCancel();
   drawConnections();
 }
+
+// Wire global mouse/touch handlers (attached to document so drag works outside canvas)
+document.addEventListener('mousemove', e => {
+  if (wireDrag.active) { updatePortDrag(e.clientX, e.clientY); return; }
+  // ... rest handled in pan/drag section
+}, { capture: false });
+
+document.addEventListener('mouseup', e => {
+  if (wireDrag.active) { commitPortDrag(e.clientX, e.clientY); return; }
+}, { capture: false });
+
+document.addEventListener('touchmove', e => {
+  if (wireDrag.active) {
+    e.preventDefault();
+    updatePortDrag(e.touches[0].clientX, e.touches[0].clientY);
+    return;
+  }
+}, { capture: false, passive: false });
+
+document.addEventListener('touchend', e => {
+  if (wireDrag.active) {
+    const t = e.changedTouches[0];
+    commitPortDrag(t.clientX, t.clientY);
+    return;
+  }
+}, { capture: false });
 
 function showWireCancel() {
   let btn = document.getElementById('wireCancelBtn');
@@ -1601,104 +1915,187 @@ function hideWireCancel() {
   if (btn) btn.style.display = 'none';
 }
 
+// Legacy alias used by old cancel button etc.
+function handlePortClick(nodeId, portType) {
+  handlePortClick_commit(nodeId, portType);
+  drawConnections();
+}
+
 function getPortCenter(nodeId, port) {
   const node = blockNodes.find(b => b.id === nodeId);
   if (!node) return null;
-  const cr = canvasWrap.getBoundingClientRect();
-  const nr = node.el.getBoundingClientRect();
-  if (port === 'top')    return { x: nr.left + nr.width / 2 - cr.left, y: nr.top - cr.top };
-  if (port === 'bottom') return { x: nr.left + nr.width / 2 - cr.left, y: nr.bottom - cr.top };
-  if (port === 'body')   return { x: nr.right - cr.left, y: nr.top + nr.height / 2 - cr.top };
+  const w = node.el.offsetWidth;
+  const h = node.el.offsetHeight;
+  if (port === 'top')    return { x: node.x + w / 2, y: node.y - 7 };
+  if (port === 'bottom') return { x: node.x + w / 2, y: node.y + h + 7 };
+  if (port === 'body')   return { x: node.x + w,     y: node.y + h / 2 };
+  return null;
+}
+
+// Returns left/right edge coords for ribbon wire — canvas-local
+function getPortEdges(nodeId, port) {
+  const node = blockNodes.find(b => b.id === nodeId);
+  if (!node) return null;
+  const w = node.el.offsetWidth;
+  const h = node.el.offsetHeight;
+  if (port === 'top')    return { lx: node.x,     rx: node.x + w, y: node.y - 7 };
+  if (port === 'bottom') return { lx: node.x,     rx: node.x + w, y: node.y + h + 7 };
+  if (port === 'body')   return { lx: node.x + w, rx: node.x + w, y: node.y + h / 2 };
   return null;
 }
 
 // ============================================================
-// MOUSE DRAG
+// ZOOM / PAN / DRAG — unified camera system
+// coordinate model: screen = canvas * zoom + pan  (pan is wrapper-relative)
 // ============================================================
+function applyTransform() {
+  canvas.style.transformOrigin = '0 0';
+  canvas.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`;
+}
+function applyZoom() { applyTransform(); drawConnections(); }
+
+// Zoom keeping canvas point under (wx, wy) [wrapper-relative] fixed
+function zoomAtPoint(newZoom, wx, wy) {
+  const clamped = Math.min(3, Math.max(0.15, newZoom));
+  const cx = (wx - panX) / zoom;
+  const cy = (wy - panY) / zoom;
+  zoom = clamped;
+  panX = wx - cx * zoom;
+  panY = wy - cy * zoom;
+  applyTransform();
+  drawConnections();
+}
+
+function zoomIn()    { const r = canvasWrap.getBoundingClientRect(); zoomAtPoint(zoom * 1.18, r.width / 2, r.height / 2); }
+function zoomOut()   { const r = canvasWrap.getBoundingClientRect(); zoomAtPoint(zoom / 1.18, r.width / 2, r.height / 2); }
+function resetView() { zoom = 1; panX = 40; panY = 40; applyTransform(); drawConnections(); }
+
+// Wheel zoom toward cursor
+canvasWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r  = canvasWrap.getBoundingClientRect();
+  const wx = e.clientX - r.left;
+  const wy = e.clientY - r.top;
+  zoomAtPoint(zoom * (e.deltaY < 0 ? 1.1 : 0.9), wx, wy);
+}, { passive: false });
+
+// ---- MOUSE: pan on background, drag blocks ----
+let isPanning = false, panStart = { x: 0, y: 0 };
+
+canvasWrap.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const bg = e.target === canvasWrap || e.target === canvas || e.target.id === 'svgLayer';
+  if (!bg) return;
+  if (wireDrag.active || pendingClick) { cancelWireConnect(); return; }
+  e.preventDefault();
+  isPanning  = true;
+  panStart.x = e.clientX - panX;
+  panStart.y = e.clientY - panY;
+  canvasWrap.style.cursor = 'grabbing';
+});
+
 document.addEventListener('mousemove', e => {
+  if (wireDrag.active) return;
+  if (isPanning) {
+    panX = e.clientX - panStart.x;
+    panY = e.clientY - panStart.y;
+    applyTransform();
+    drawConnections();
+    return;
+  }
   if (!draggingBlock) return;
   const node = blockNodes.find(b => b.id === draggingBlock);
   if (!node) return;
-  const rect = canvasWrap.getBoundingClientRect();
-  const x = (e.clientX - rect.left - dragOffset.x - panX) / zoom;
-  const y = (e.clientY - rect.top - dragOffset.y - panY) / zoom;
-  node.el.style.left = x + 'px';
-  node.el.style.top = y + 'px';
-  node.x = x; node.y = y;
+  const r = canvasWrap.getBoundingClientRect();
+  node.x = (e.clientX - r.left - panX) / zoom - dragOffset.x;
+  node.y = (e.clientY - r.top  - panY) / zoom - dragOffset.y;
+  node.el.style.left = node.x + 'px';
+  node.el.style.top  = node.y + 'px';
+  updateProximity(draggingBlock);
   drawConnections();
 });
-document.addEventListener('mouseup', e => {
+
+document.addEventListener('mouseup', () => {
+  if (wireDrag.active) return;
+  if (isPanning) { isPanning = false; canvasWrap.style.cursor = ''; }
   if (draggingBlock) {
-    const node = blockNodes.find(b => b.id === draggingBlock);
-    if (node) node.el.classList.remove('dragging');
+    commitProximityConnect(draggingBlock);
+    const n = blockNodes.find(b => b.id === draggingBlock);
+    if (n) n.el.classList.remove('dragging');
     draggingBlock = null;
+    qDraggingDefId = null;
   }
 });
 
-// Touch move/end for block dragging
+// ---- TOUCH: pan / pinch-zoom / block drag ----
+let lastPinchDist = null;
+let touchPanning  = false, touchPanStart = { x: 0, y: 0 };
+
+canvasWrap.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    lastPinchDist = null;
+    touchPanning  = false;
+    return;
+  }
+  if (e.touches.length === 1 && !draggingBlock) {
+    const bg = e.target === canvasWrap || e.target === canvas || e.target.id === 'svgLayer';
+    if (bg) {
+      const t = e.touches[0];
+      touchPanning    = true;
+      touchPanStart.x = t.clientX - panX;
+      touchPanStart.y = t.clientY - panY;
+    }
+  }
+}, { passive: true });
+
 document.addEventListener('touchmove', e => {
-  if (!draggingBlock) return;
-  e.preventDefault();
-  const touch = e.touches[0];
-  const node = blockNodes.find(b => b.id === draggingBlock);
-  if (!node) return;
-  const rect = canvasWrap.getBoundingClientRect();
-  const x = (touch.clientX - rect.left - dragOffset.x - panX) / zoom;
-  const y = (touch.clientY - rect.top - dragOffset.y - panY) / zoom;
-  node.el.style.left = x + 'px';
-  node.el.style.top = y + 'px';
-  node.x = x; node.y = y;
-  drawConnections();
+  if (wireDrag.active) return; // handled by wire drag listener
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    if (lastPinchDist !== null) {
+      const r   = canvasWrap.getBoundingClientRect();
+      const wx  = (t0.clientX + t1.clientX) / 2 - r.left;
+      const wy  = (t0.clientY + t1.clientY) / 2 - r.top;
+      zoomAtPoint(zoom * dist / lastPinchDist, wx, wy);
+    }
+    lastPinchDist = dist;
+    return;
+  }
+  if (draggingBlock) {
+    e.preventDefault();
+    const t = e.touches[0];
+    const node = blockNodes.find(b => b.id === draggingBlock);
+    if (!node) return;
+    const r = canvasWrap.getBoundingClientRect();
+    node.x = (t.clientX - r.left - panX) / zoom - dragOffset.x;
+    node.y = (t.clientY - r.top  - panY) / zoom - dragOffset.y;
+    node.el.style.left = node.x + 'px';
+    node.el.style.top  = node.y + 'px';
+    drawConnections();
+    return;
+  }
+  if (touchPanning) {
+    e.preventDefault();
+    const t = e.touches[0];
+    panX = t.clientX - touchPanStart.x;
+    panY = t.clientY - touchPanStart.y;
+    applyTransform();
+    drawConnections();
+  }
 }, { passive: false });
 
 document.addEventListener('touchend', e => {
-  if (draggingBlock) {
-    const node = blockNodes.find(b => b.id === draggingBlock);
-    if (node) node.el.classList.remove('dragging');
+  if (wireDrag.active) return; // handled by wire drag listener
+  if (e.touches.length < 2) lastPinchDist = null;
+  if (e.touches.length === 0) { touchPanning = false; }
+  if (draggingBlock && e.touches.length === 0) {
+    const n = blockNodes.find(b => b.id === draggingBlock);
+    if (n) n.el.classList.remove('dragging');
     draggingBlock = null;
   }
 });
-
-// ============================================================
-// ZOOM / PAN
-// ============================================================
-canvasWrap.addEventListener('wheel', e => {
-  e.preventDefault();
-  const factor = e.deltaY < 0 ? 1.1 : 0.9;
-  zoom = Math.min(2, Math.max(0.3, zoom * factor));
-  applyZoom();
-}, { passive: false });
-
-// Pinch to zoom (touch)
-let lastPinchDist = null;
-canvasWrap.addEventListener('touchstart', e => {
-  if (e.touches.length === 2) lastPinchDist = null;
-}, { passive: true });
-canvasWrap.addEventListener('touchmove', e => {
-  if (e.touches.length === 2 && !draggingBlock) {
-    e.preventDefault();
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (lastPinchDist !== null) {
-      const factor = dist / lastPinchDist;
-      zoom = Math.min(2, Math.max(0.3, zoom * factor));
-      applyZoom();
-    }
-    lastPinchDist = dist;
-  }
-}, { passive: false });
-canvasWrap.addEventListener('touchend', e => {
-  if (e.touches.length < 2) lastPinchDist = null;
-}, { passive: true });
-
-function applyZoom() {
-  canvas.style.transform = `scale(${zoom}) translate(${panX}px, ${panY}px)`;
-  canvas.style.transformOrigin = '0 0';
-}
-function zoomIn() { zoom = Math.min(2, zoom * 1.15); applyZoom(); }
-function zoomOut() { zoom = Math.max(0.3, zoom / 1.15); applyZoom(); }
-function resetView() { zoom = 1; panX = 0; panY = 0; applyZoom(); }
 
 function autoArrange() {
   const cols = Math.ceil(Math.sqrt(blockNodes.length));
@@ -1714,6 +2111,17 @@ function autoArrange() {
   setStatus('Auto-arranged!');
 }
 
+// Build a ribbon SVG path between two port edge sets
+function ribbonPath(e1, e2) {
+  // e1, e2: { lx, rx, y }
+  const cy = (e1.y + e2.y) / 2;
+  // Left edge bezier (top-left → bottom-left)
+  const left  = `M${e1.lx},${e1.y} C${e1.lx},${cy} ${e2.lx},${cy} ${e2.lx},${e2.y}`;
+  // Right edge bezier reversed (bottom-right → top-right) to close the shape
+  const right = `L${e2.rx},${e2.y} C${e2.rx},${cy} ${e1.rx},${cy} ${e1.rx},${e1.y} Z`;
+  return left + ' ' + right;
+}
+
 // ============================================================
 // CONNECTIONS (SVG)
 // ============================================================
@@ -1721,49 +2129,134 @@ function drawConnections() {
   const svg = document.getElementById('svgLayer');
   svg.innerHTML = '';
 
+  // Define gradient for ribbons
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+  grad.setAttribute('id', 'ribGrad');
+  grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+  grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+  grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+  [['0%','rgba(124,92,252,0.55)'],['50%','rgba(0,229,255,0.35)'],['100%','rgba(124,92,252,0.55)']].forEach(([offset, color]) => {
+    const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('stop-color', color);
+    grad.appendChild(stop);
+  });
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+
   connections.forEach(({ from, fromPort, to, toPort }, idx) => {
+    const isBody = (fromPort === 'body' || toPort === 'body');
     const p1 = getPortCenter(from, fromPort || 'bottom');
     const p2 = getPortCenter(to,   toPort  || 'top');
     if (!p1 || !p2) return;
 
-    const isBody = (fromPort === 'body' || toPort === 'body');
-    let d;
-    if (isBody) {
-      const cx = (p1.x + p2.x) / 2;
-      d = `M${p1.x},${p1.y} C${cx},${p1.y} ${cx},${p2.y} ${p2.x},${p2.y}`;
+    let visPath, hitD;
+
+    if (!isBody) {
+      // Ribbon shape using edge coords
+      const e1 = getPortEdges(from, fromPort || 'bottom');
+      const e2 = getPortEdges(to,   toPort   || 'top');
+      if (e1 && e2) {
+        const shapePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shapePath.setAttribute('d', ribbonPath(e1, e2));
+        shapePath.setAttribute('fill', 'url(#ribGrad)');
+        shapePath.setAttribute('stroke', 'rgba(0,229,255,0.25)');
+        shapePath.setAttribute('stroke-width', '0.5');
+        shapePath.style.pointerEvents = 'none';
+        svg.appendChild(shapePath);
+        hitD = `M${p1.x},${p1.y} C${p1.x},${(p1.y+p2.y)/2} ${p2.x},${(p1.y+p2.y)/2} ${p2.x},${p2.y}`;
+      }
     } else {
-      const cy = (p1.y + p2.y) / 2;
-      d = `M${p1.x},${p1.y} C${p1.x},${cy} ${p2.x},${cy} ${p2.x},${p2.y}`;
+      // Body port — keep as a single bezier line (sideways)
+      const cx = (p1.x + p2.x) / 2;
+      hitD = `M${p1.x},${p1.y} C${cx},${p1.y} ${cx},${p2.y} ${p2.x},${p2.y}`;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', hitD);
+      path.setAttribute('class', 'conn-line body-line');
+      path.style.pointerEvents = 'none';
+      svg.appendChild(path);
     }
 
-    const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    hitPath.setAttribute('d', d);
-    hitPath.setAttribute('stroke', 'transparent');
-    hitPath.setAttribute('stroke-width', '14');
-    hitPath.setAttribute('fill', 'none');
-    hitPath.style.cursor = 'pointer';
-    const capturedIdx = idx;
-    hitPath.addEventListener('click', () => {
-      connections.splice(capturedIdx, 1);
-      drawConnections(); updateCodePreview(); setStatus('Wire removed');
-    });
-    svg.appendChild(hitPath);
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', d);
-    path.setAttribute('class', isBody ? 'conn-line body-line' : 'conn-line');
-    path.style.pointerEvents = 'none';
-    svg.appendChild(path);
+    if (hitD) {
+      const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hitPath.setAttribute('d', hitD);
+      hitPath.setAttribute('stroke', 'rgba(0,0,0,0)');
+      hitPath.setAttribute('stroke-width', '18');
+      hitPath.setAttribute('fill', 'none');
+      hitPath.style.pointerEvents = 'stroke';
+      hitPath.style.cursor = 'pointer';
+      const capturedIdx = idx;
+      hitPath.addEventListener('click', e => {
+        e.stopPropagation();
+        connections.splice(capturedIdx, 1);
+        drawConnections(); updateCodePreview(); setStatus('Wire removed');
+      });
+      svg.appendChild(hitPath);
+    }
   });
 
-  // Pending wire stub
-  if (wiringState.active) {
-    const origin = getPortCenter(wiringState.fromId, wiringState.fromPort);
+  // Live drag wire preview — ribbon from port edges to cursor
+  if (wireDrag.active && wireDrag.dragging) {
+    const e1 = getPortEdges(wireDrag.fromId, wireDrag.fromPort);
+    const p1 = getPortCenter(wireDrag.fromId, wireDrag.fromPort);
+    if (p1) {
+      let tx, ty, te;
+      if (wireDrag.snapTarget) {
+        const sp = getPortCenter(wireDrag.snapTarget.nodeId, wireDrag.snapTarget.portType);
+        te = getPortEdges(wireDrag.snapTarget.nodeId, wireDrag.snapTarget.portType);
+        if (sp) { tx = sp.x; ty = sp.y; }
+      }
+      if (tx === undefined) {
+        const r = canvasWrap.getBoundingClientRect();
+        tx = (wireDrag.curX - r.left - panX) / zoom;
+        ty = (wireDrag.curY - r.top  - panY) / zoom;
+      }
+
+      const isBody = wireDrag.fromPort === 'body';
+      const snapping = !!wireDrag.snapTarget;
+
+      if (!isBody && e1 && te) {
+        // Ribbon preview
+        const shapePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shapePath.setAttribute('d', ribbonPath(e1, te));
+        shapePath.setAttribute('fill', snapping ? 'rgba(0,229,255,0.4)' : 'rgba(255,255,255,0.1)');
+        shapePath.setAttribute('stroke', snapping ? 'rgba(0,229,255,0.6)' : 'rgba(255,255,255,0.2)');
+        shapePath.setAttribute('stroke-width', '0.5');
+        shapePath.style.pointerEvents = 'none';
+        svg.appendChild(shapePath);
+      } else if (!isBody && e1) {
+        // Ribbon preview to cursor — fake edge set
+        const fakeEdge = { lx: tx - (e1.rx - e1.lx) / 2, rx: tx + (e1.rx - e1.lx) / 2, y: ty };
+        const shapePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shapePath.setAttribute('d', ribbonPath(e1, fakeEdge));
+        shapePath.setAttribute('fill', 'rgba(255,255,255,0.08)');
+        shapePath.setAttribute('stroke', 'rgba(255,255,255,0.15)');
+        shapePath.setAttribute('stroke-width', '0.5');
+        shapePath.style.pointerEvents = 'none';
+        svg.appendChild(shapePath);
+      } else {
+        // Body port — single line
+        const cx = (p1.x + tx) / 2;
+        const previewLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        previewLine.setAttribute('d', `M${p1.x},${p1.y} C${cx},${p1.y} ${cx},${ty} ${tx},${ty}`);
+        previewLine.setAttribute('stroke', snapping ? 'var(--accent2)' : 'var(--text-dim)');
+        previewLine.setAttribute('stroke-width', snapping ? '2' : '1.5');
+        previewLine.setAttribute('fill', 'none');
+        previewLine.setAttribute('stroke-dasharray', '6 3');
+        previewLine.setAttribute('opacity', snapping ? '1' : '0.4');
+        previewLine.style.pointerEvents = 'none';
+        svg.appendChild(previewLine);
+      }
+    }
+  } else if (pendingClick) {
+    // Click-mode pending stub
+    const origin = getPortCenter(pendingClick.fromId, pendingClick.fromPort);
     if (origin) {
-      const isBody = wiringState.fromPort === 'body';
-      const stubLen = 32;
+      const isBody = pendingClick.fromPort === 'body';
+      const stubLen = 28;
       const x2 = isBody ? origin.x + stubLen : origin.x;
-      const y2 = isBody ? origin.y : origin.y + (wiringState.fromPort === 'top' ? -stubLen : stubLen);
+      const y2 = isBody ? origin.y : origin.y + (pendingClick.fromPort === 'top' ? -stubLen : stubLen);
       const stub = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       stub.setAttribute('x1', origin.x); stub.setAttribute('y1', origin.y);
       stub.setAttribute('x2', x2);       stub.setAttribute('y2', y2);
@@ -1773,11 +2266,22 @@ function drawConnections() {
       stub.setAttribute('opacity', '0.85');
       stub.style.pointerEvents = 'none';
       svg.appendChild(stub);
-      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('cx', x2); dot.setAttribute('cy', y2);
-      dot.setAttribute('r', '4'); dot.setAttribute('fill', 'var(--accent2)');
-      dot.setAttribute('opacity', '0.9'); dot.style.pointerEvents = 'none';
-      svg.appendChild(dot);
+    }
+  }
+
+  // Proximity auto-connect ghost while dragging a block
+  if (draggingBlock && proximityTarget) {
+    const fromEdge = getPortEdges(draggingBlock, proximityTarget.fromPort);
+    const toEdge   = getPortEdges(proximityTarget.nodeId, proximityTarget.toPort);
+    if (fromEdge && toEdge) {
+      const ghost = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      ghost.setAttribute('d', ribbonPath(fromEdge, toEdge));
+      ghost.setAttribute('fill', 'rgba(0,229,255,0.25)');
+      ghost.setAttribute('stroke', 'rgba(0,229,255,0.5)');
+      ghost.setAttribute('stroke-width', '0.5');
+      ghost.setAttribute('stroke-dasharray', '6 3');
+      ghost.style.pointerEvents = 'none';
+      svg.appendChild(ghost);
     }
   }
 }
@@ -2691,6 +3195,194 @@ function parseCodeToCanvas() {
 
   setStatus(`Parsed ${parsed.length} blocks from code`);
 }
+
+// ============================================================
+// PROXIMITY AUTO-CONNECT (while dragging a block)
+// ============================================================
+const PROX_RADIUS = 60; // canvas-units
+let proximityTarget = null; // { nodeId, fromPort, toPort } — pending auto-connect
+
+function updateProximity(draggingId) {
+  const dragNode = blockNodes.find(b => b.id === draggingId);
+  if (!dragNode) { proximityTarget = null; return; }
+
+  // Check all port combos of dragging block against all other blocks
+  const dragPorts = ['top', 'bottom', ...(dragNode.def.hasBody ? ['body'] : [])];
+  let best = null, bestDist = PROX_RADIUS;
+
+  blockNodes.forEach(other => {
+    if (other.id === draggingId) return;
+    const otherPorts = ['top', 'bottom', ...(other.def.hasBody ? ['body'] : [])];
+    dragPorts.forEach(dp => {
+      const p1 = getPortCenter(draggingId, dp);
+      if (!p1) return;
+      otherPorts.forEach(op => {
+        if (!isCompatiblePort(draggingId, dp, other.id, op)) return;
+        const p2 = getPortCenter(other.id, op);
+        if (!p2) return;
+        const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = { nodeId: other.id, fromPort: dp, toPort: op };
+        }
+      });
+    });
+  });
+
+  // Update highlight
+  if (proximityTarget) {
+    const prev = blockNodes.find(b => b.id === proximityTarget.nodeId);
+    if (prev) prev.el.classList.remove('proximity-snap');
+  }
+  proximityTarget = best;
+  if (best) {
+    const tn = blockNodes.find(b => b.id === best.nodeId);
+    if (tn) tn.el.classList.add('proximity-snap');
+  }
+}
+
+function commitProximityConnect(draggingId) {
+  if (!proximityTarget) return;
+  const tn = blockNodes.find(b => b.id === proximityTarget.nodeId);
+  if (tn) tn.el.classList.remove('proximity-snap');
+  makeConnection(draggingId, proximityTarget.fromPort, proximityTarget.nodeId, proximityTarget.toPort);
+  proximityTarget = null;
+  drawConnections();
+  updateCodePreview();
+}
+
+// ============================================================
+// Q MENU
+// ============================================================
+let qMenuOpen = false;
+let qActiveCat = null;
+let qDraggingDefId = null; // block being dragged out of Q menu
+
+function buildQMenu() {
+  const cats = document.getElementById('qMenuCats');
+  const subcats = document.getElementById('qMenuSubcats');
+  cats.innerHTML = ''; subcats.innerHTML = '';
+
+  const catList = Object.keys(CAT_META);
+  catList.forEach((cat, i) => {
+    const tab = document.createElement('div');
+    tab.className = 'q-cat-tab' + (i === 0 ? ' active' : '');
+    tab.textContent = CAT_META[cat].label;
+    tab.style.color = i === 0 ? CAT_META[cat].color : '';
+    tab.dataset.cat = cat;
+    tab.addEventListener('mousedown', e => { e.stopPropagation(); selectQCat(cat); });
+    cats.appendChild(tab);
+
+    const sub = document.createElement('div');
+    sub.className = 'q-subcat' + (i === 0 ? ' active' : '');
+    sub.textContent = CAT_META[cat].label;
+    sub.style.borderLeftColor = i === 0 ? CAT_META[cat].color : 'transparent';
+    sub.dataset.cat = cat;
+    sub.addEventListener('mousedown', e => { e.stopPropagation(); selectQCat(cat); });
+    subcats.appendChild(sub);
+  });
+
+  selectQCat(catList[0]);
+}
+
+function selectQCat(cat) {
+  qActiveCat = cat;
+  // Update tab + subcat active states
+  document.querySelectorAll('.q-cat-tab').forEach(t => {
+    const active = t.dataset.cat === cat;
+    t.classList.toggle('active', active);
+    t.style.color = active ? CAT_META[cat].color : '';
+  });
+  document.querySelectorAll('.q-subcat').forEach(s => {
+    const active = s.dataset.cat === cat;
+    s.classList.toggle('active', active);
+    s.style.borderLeftColor = active ? CAT_META[s.dataset.cat].color : 'transparent';
+  });
+
+  // Render grid
+  const grid = document.getElementById('qMenuGrid');
+  grid.innerHTML = '';
+  BLOCK_DEFS.filter(b => b.cat === cat).forEach(def => {
+    const card = document.createElement('div');
+    card.className = 'q-block-card';
+    card.style.borderTopColor = def.color;
+
+    // Render actual block header + body preview
+    const fakeFields = {};
+    def.fields.forEach(f => fakeFields[f.name] = f.default);
+
+    const hdr = document.createElement('div');
+    hdr.className = 'block-header';
+    hdr.style.background = def.color + 'cc';
+    hdr.innerHTML = `<span class="bh-icon">${def.icon}</span><span class="bh-label">${def.label}</span>`;
+
+    const bod = document.createElement('div');
+    bod.className = 'block-body';
+    bod.style.fontSize = '11px';
+    if (def.fields.length) {
+      def.fields.forEach(f => {
+        const row = document.createElement('div');
+        row.className = 'block-field';
+        row.innerHTML = `<label>${f.label}</label><span style="flex:1;background:var(--surface3);border-radius:4px;padding:3px 6px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.default}</span>`;
+        bod.appendChild(row);
+      });
+    } else {
+      bod.innerHTML = `<span style="font-size:10px;color:var(--text-dim);font-family:JetBrains Mono,monospace;">${def.code(fakeFields)}</span>`;
+    }
+
+    card.appendChild(hdr);
+    card.appendChild(bod);
+
+    card.addEventListener('mousedown', e => {
+      e.preventDefault(); e.stopPropagation();
+      qDraggingDefId = def.id;
+      // Start a real block drag — place block at cursor, then let normal drag take over
+      const r = canvasWrap.getBoundingClientRect();
+      const x = (e.clientX - r.left - panX) / zoom - 90;
+      const y = (e.clientY - r.top  - panY) / zoom - 30;
+      addBlock(def.id, x, y);
+      const newNode = blockNodes[blockNodes.length - 1];
+      draggingBlock = newNode.id;
+      dragOffset.x = 90 / zoom;
+      dragOffset.y = 30 / zoom;
+      newNode.el.classList.add('dragging');
+    });
+
+    grid.appendChild(card);
+  });
+}
+
+function openQMenu() {
+  if (qMenuOpen) return;
+  qMenuOpen = true;
+  const m = document.getElementById('qMenu');
+  m.style.display = 'flex';
+  buildQMenu();
+}
+
+function closeQMenu() {
+  if (!qMenuOpen) return;
+  qMenuOpen = false;
+  document.getElementById('qMenu').style.display = 'none';
+}
+
+// Q key hold
+let qKeyDown = false;
+document.addEventListener('keydown', e => {
+  // Don't trigger if user is typing in an input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'q' || e.key === 'Q') {
+    if (!qKeyDown) { qKeyDown = true; openQMenu(); }
+    e.preventDefault();
+  }
+  if (e.key === 'Escape') { closeQMenu(); cancelWireConnect(); }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'q' || e.key === 'Q') {
+    qKeyDown = false;
+    closeQMenu();
+  }
+});
 
 // ============================================================
 // INIT
