@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnakeScratch — Visual Python</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f1a;
+    --surface: #13152a;
+    --surface2: #1a1d35;
+    --surface3: #21254a;
+    --border: #2a2f5a;
+    --accent: #7c5cfc;
+    --accent2: #00e5ff;
+    --accent3: #ff6b6b;
+    --accent4: #ffd166;
+    --accent5: #06d6a0;
+    --text: #e8eaff;
+    --text-dim: #6b7099;
+    --text-muted: #3a3f6e;
+
+    --cat-control: #7c5cfc;
+    --cat-data: #00b4d8;
+    --cat-math: #06d6a0;
+    --cat-logic: #ff6b6b;
+    --cat-function: #ffd166;
+    --cat-io: #ff9f1c;
+    --cat-list: #c77dff;
+    --cat-string: #43aa8b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Rubik', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---- HEADER ---- */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: -1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo-snake { font-size: 22px; }
+
+  .header-btns {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    align-items: center;
+  }
+
+  .btn {
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Rubik', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: #9070ff; transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--surface3);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--surface2); }
+  .btn-danger {
+    background: transparent;
+    color: var(--accent3);
+    border: 1px solid var(--accent3);
+  }
+  .btn-danger:hover { background: rgba(255,107,107,0.1); }
+
+  .project-name {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    font-family: 'Rubik', sans-serif;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .project-name:focus { border-color: var(--accent); background: var(--surface2); }
+
+  /* ---- MAIN LAYOUT ---- */
+  .app {
+    display: grid;
+    grid-template-columns: 220px 1fr 340px;
+    height: calc(100vh - 52px);
+    overflow: hidden;
+  }
+
+  /* ---- SIDEBAR / BLOCK PALETTE ---- */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sidebar-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    border-bottom: 2px solid transparent;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .sidebar-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .sidebar-tab:hover:not(.active) { color: var(--text); }
+
+  .block-categories { overflow-y: auto; flex: 1; padding: 8px; }
+  .block-categories::-webkit-scrollbar { width: 4px; }
+  .block-categories::-webkit-scrollbar-track { background: transparent; }
+  .block-categories::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .cat-header {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 10px 6px 4px;
+  }
+
+  .palette-block {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin: 3px 0;
+    cursor: grab;
+    font-size: 12px;
+    font-weight: 500;
+    user-select: none;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+    background: var(--surface2);
+  }
+  .palette-block:hover { transform: translateX(3px); filter: brightness(1.15); }
+  .palette-block:active { cursor: grabbing; transform: scale(0.97); }
+  .palette-block .block-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+
+  /* ---- CANVAS ---- */
+  .canvas-wrap {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(124,92,252,0.06) 0%, transparent 60%),
+      linear-gradient(rgba(42,47,90,0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42,47,90,0.3) 1px, transparent 1px);
+    background-size: 100% 100%, 30px 30px, 30px 30px;
+  }
+
+  .canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .canvas-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-muted);
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .canvas-hint .hint-icon { font-size: 48px; margin-bottom: 12px; display: block; }
+  .canvas-hint p { font-size: 14px; }
+
+  /* ---- BLOCK ON CANVAS ---- */
+  .block-node {
+    position: absolute;
+    min-width: 180px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    cursor: move;
+    user-select: none;
+    z-index: 10;
+    transition: box-shadow 0.15s;
+  }
+  .block-node:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 20; }
+  .block-node.dragging { z-index: 100; box-shadow: 0 16px 50px rgba(0,0,0,0.6); }
+  .block-node.selected { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
+  .block-header {
+    padding: 8px 12px;
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .block-header .bh-icon { font-size: 14px; }
+  .block-header .bh-label { flex: 1; }
+  .block-close {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    border: none;
+    background: rgba(0,0,0,0.25);
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    transition: background 0.15s;
+  }
+  .block-close:hover { background: rgba(255,107,107,0.5); color: white; }
+
+  .block-body {
+    padding: 10px 12px;
+    background: rgba(13,15,26,0.85);
+    border-radius: 0 0 10px 10px;
+  }
+
+  .block-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .block-field label { white-space: nowrap; font-size: 11px; min-width: 50px; }
+  .block-field input, .block-field select {
+    flex: 1;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: var(--text);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    outline: none;
+    transition: border-color 0.15s;
+    min-width: 0;
+  }
+  .block-field input:focus, .block-field select:focus { border-color: var(--accent); }
+
+  /* connector ports */
+  .block-connector {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--surface3);
+    border: 2px solid var(--border);
+    cursor: crosshair;
+    transition: all 0.15s;
+    z-index: 5;
+  }
+  .block-connector:hover { border-color: var(--accent2); background: var(--accent2); transform: translateX(-50%) scale(1.3); }
+  .block-connector.top { top: -6px; }
+  .block-connector.bottom { bottom: -6px; }
+
+  /* connected line */
+  svg.connections {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .conn-line {
+    stroke: var(--accent);
+    stroke-width: 2;
+    fill: none;
+    stroke-dasharray: 5 3;
+    animation: dashflow 1s linear infinite;
+    opacity: 0.6;
+  }
+  @keyframes dashflow { to { stroke-dashoffset: -8; } }
+
+  /* ---- RIGHT PANEL ---- */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-tab {
+    flex: 1;
+    padding: 12px 8px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    border-bottom: 2px solid transparent;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .panel-tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+  .panel-tab:hover:not(.active) { color: var(--text); }
+
+  .panel-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .panel-content.active { display: flex; }
+
+  /* Code preview */
+  .code-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .code-toolbar {
+    padding: 8px 12px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .code-toolbar span {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  pre {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+    margin: 0;
+    white-space: pre;
+  }
+  pre::-webkit-scrollbar { width: 4px; height: 4px; }
+  pre::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* syntax highlight */
+  .kw { color: #c792ea; }
+  .fn { color: #82aaff; }
+  .st { color: #c3e88d; }
+  .nm { color: var(--accent4); }
+  .cm { color: var(--text-muted); font-style: italic; }
+  .op { color: var(--accent3); }
+  .bltn { color: var(--accent2); }
+
+  /* Output */
+  .output-area {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+    background: var(--bg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .output-area::-webkit-scrollbar { width: 4px; }
+  .output-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .output-line { padding: 2px 0; white-space: pre-wrap; word-break: break-all; }
+  .output-line.info { color: var(--text-dim); }
+  .output-line.ok { color: var(--accent5); }
+  .output-line.err { color: var(--accent3); }
+  .output-line.out { color: var(--text); }
+
+  /* Variables panel */
+  .vars-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .var-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+  }
+  .var-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent4); flex: 1; }
+  .var-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent5); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .var-type { font-size: 10px; color: var(--text-muted); background: var(--surface3); padding: 2px 6px; border-radius: 4px; }
+  .vars-empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 30px; }
+
+  /* Canvas toolbar */
+  .canvas-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 50;
+  }
+  .ct-btn {
+    width: 36px; height: 36px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .ct-btn:hover { background: var(--surface3); color: var(--text); border-color: var(--accent); }
+
+  /* Mini-map */
+  .minimap {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 120px;
+    height: 80px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    z-index: 50;
+    opacity: 0.7;
+  }
+
+  /* Block connection arrows */
+  .arrow-connector {
+    position: absolute;
+    pointer-events: none;
+    z-index: 15;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text);
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+    max-width: 200px;
+  }
+
+  /* Floating input prompt */
+  .floating-prompt {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    z-index: 10100;
+    display: none;
+    min-width: 300px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .floating-prompt h3 { font-size: 14px; margin-bottom: 12px; color: var(--accent); }
+  .floating-prompt input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 10px;
+  }
+  .floating-prompt input:focus { border-color: var(--accent); }
+  .fp-btns { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Backdrop - dimming layer only, pointer-events off so drawer content is always tappable */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 175;
+    display: none;
+    pointer-events: none;
+  }
+
+  /* Status bar */
+  .statusbar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 24px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    z-index: 50;
+  }
+  .status-item span { color: var(--text-dim); }
+
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  .block-node { animation: fadeIn 0.15s ease; }
+
+  /* ============================================================
+     MOBILE STYLES
+  ============================================================ */
+
+  /* Mobile bottom nav */
+  .mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+    align-items: stretch;
+  }
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'Rubik', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-nav-btn .nav-icon { font-size: 20px; line-height: 1; }
+  .mobile-nav-btn.active { color: var(--accent); }
+  .mobile-nav-btn:active { background: var(--surface2); }
+
+  /* Mobile run FAB */
+  .mobile-fab {
+    display: none;
+    position: fixed;
+    bottom: 76px;
+    right: 16px;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    z-index: 200;
+    box-shadow: 0 4px 20px rgba(124,92,252,0.5);
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .mobile-fab:active { transform: scale(0.92); box-shadow: 0 2px 10px rgba(124,92,252,0.4); }
+
+  /* Slide-up drawer (blocks palette on mobile) */
+  .mobile-drawer {
+    display: none;
+    position: fixed;
+    bottom: 60px; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    z-index: 190;
+    flex-direction: column;
+    max-height: 70vh;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .mobile-drawer.open { transform: translateY(0); }
+  .drawer-handle {
+    width: 100%;
+    padding: 14px 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .drawer-handle::after {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+  .drawer-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+  .drawer-search {
+    margin: 0 12px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'Rubik', sans-serif;
+    outline: none;
+    flex-shrink: 0;
+  }
+  .drawer-search:focus { border-color: var(--accent); }
+  .drawer-blocks { overflow-y: auto; flex: 1; padding: 4px 12px 12px; }
+  .drawer-blocks::-webkit-scrollbar { display: none; }
+
+  /* Mobile panel overlay (code/output/vars on mobile) */
+  .mobile-panel-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    bottom: 60px;
+    background: var(--surface);
+    z-index: 180;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .mobile-panel-overlay.open { transform: translateY(0); }
+  .mobile-panel-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .mobile-panel-title { font-size: 15px; font-weight: 700; flex: 1; }
+  .mobile-close-btn {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Rubik', sans-serif;
+    font-weight: 600;
+  }
+
+  /* Mobile block cards in drawer - bigger tap targets */
+  @media (max-width: 768px) {
+    header {
+      padding: 0 12px;
+      height: 50px;
+    }
+    .logo { font-size: 15px; }
+    .logo-snake { font-size: 18px; }
+    .project-name { display: none; }
+    .header-btns .btn-secondary { display: none; }
+    .header-btns .btn-primary { display: none; } /* replaced by FAB */
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+      height: calc(100vh - 50px);
+    }
+    .sidebar { display: none; }
+    .right-panel { display: none; }
+    .canvas-wrap { grid-column: 1; grid-row: 1; padding-bottom: 60px; }
+    .statusbar { bottom: 0; display: none; }
+    .canvas-toolbar { top: 8px; right: 8px; }
+    .ct-btn { width: 40px; height: 40px; font-size: 18px; }
+    .mobile-nav { display: flex; }
+    .mobile-fab { display: flex; }
+    .mobile-drawer { display: flex; }
+    .mobile-panel-overlay { display: flex; }
+    /* Bigger block inputs on touch */
+    .block-field input, .block-field select {
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+    .block-field label { font-size: 12px; }
+    .block-header { padding: 10px 14px; font-size: 13px; }
+    .block-close { width: 24px; height: 24px; font-size: 14px; }
+    .block-node { min-width: 200px; }
+    /* Canvas hint */
+    .canvas-hint p { font-size: 13px; }
+    .canvas-hint .hint-icon { font-size: 36px; }
+    /* Palette blocks in drawer */
+    .drawer-blocks .palette-block {
+      padding: 12px 14px;
+      font-size: 14px;
+      margin: 5px 0;
+      border-radius: 10px;
+    }
+    .drawer-blocks .palette-block .block-icon { font-size: 18px; }
+    .drawer-blocks .cat-header { font-size: 11px; padding: 14px 6px 5px; }
+    /* code preview */
+    pre { font-size: 13px; }
+    .output-area { font-size: 13px; }
+  }
+
+  /* Extra small screens */
+  @media (max-width: 380px) {
+    .mobile-nav-btn { font-size: 9px; }
+    .mobile-nav-btn .nav-icon { font-size: 18px; }
+    .ct-btn { width: 36px; height: 36px; }
+  }
+
+  /* Pinch-zoom visual feedback */
+  .canvas-wrap.pinching { cursor: zoom-in; }
+
+  /* Touch drag ghost */
+  .touch-ghost {
+    position: fixed;
+    z-index: 9000;
+    pointer-events: none;
+    opacity: 0.85;
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    transform: scale(1.05);
+    transition: none;
+    background: var(--surface2);
+    padding: 10px 14px;
+    font-family: 'Rubik', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-left: 3px solid transparent;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-snake">🐍</span>
+    SnakeScratch
+  </div>
+  <input class="project-name" id="projectName" value="my_project.py" title="Click to rename" />
+  <div class="header-btns">
+    <button class="btn btn-secondary" onclick="clearCanvas()">🗑 Clear</button>
+    <button class="btn btn-secondary" onclick="loadExample()">📦 Examples</button>
+    <button class="btn btn-secondary" onclick="exportCode()">💾 Export .py</button>
+    <button class="btn btn-primary" onclick="runCode()">▶ Run</button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab active" onclick="switchSideTab('blocks', this)">Blocks</div>
+      <div class="sidebar-tab" onclick="switchSideTab('search', this)">Search</div>
+    </div>
+    <div id="blocksPanel" class="block-categories">
+      <!-- Populated by JS -->
+    </div>
+    <div id="searchPanel" class="block-categories" style="display:none;">
+      <input id="blockSearch" oninput="filterBlocks(this.value)" placeholder="Search blocks..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;outline:none;margin-bottom:8px;font-family:Rubik,sans-serif;">
+      <div id="searchResults"></div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="canvas" id="canvas">
+      <svg class="connections" id="svgLayer"></svg>
+      <div class="canvas-hint" id="canvasHint">
+        <span class="hint-icon">🧱</span>
+        <p id="canvasHintText">Drag blocks from the left panel<br>to start building your program</p>
+      </div>
+    </div>
+
+    <div class="canvas-toolbar">
+      <button class="ct-btn" title="Zoom In" onclick="zoomIn()">+</button>
+      <button class="ct-btn" title="Zoom Out" onclick="zoomOut()">−</button>
+      <button class="ct-btn" title="Reset View" onclick="resetView()">⊡</button>
+      <button class="ct-btn" title="Auto-arrange" onclick="autoArrange()">⚡</button>
+    </div>
+
+    <div class="statusbar">
+      <span class="status-item">Blocks: <span id="blockCount">0</span></span>
+      <span class="status-item">Lines: <span id="lineCount">0</span></span>
+      <span class="status-item" id="statusMsg">Ready</span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab('code', this)">Code</div>
+      <div class="panel-tab" onclick="switchTab('output', this)">Output</div>
+      <div class="panel-tab" onclick="switchTab('vars', this)">Variables</div>
+    </div>
+
+    <div class="panel-content active" id="tab-code">
+      <div class="code-area">
+        <div class="code-toolbar">
+          <span id="codeStats">0 lines · 0 chars</span>
+          <button class="btn btn-secondary" style="margin-left:auto;padding:4px 10px;font-size:11px;" onclick="copyCode()">Copy</button>
+        </div>
+        <pre id="codePreview"><span class="cm"># Your Python code will appear here
+# Start adding blocks to the canvas!</span></pre>
+      </div>
+    </div>
+
+    <div class="panel-content" id="tab-output">
+      <div class="code-toolbar" style="justify-content:space-between;">
+        <span style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">Output Console</span>
+        <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="clearOutput()">Clear</button>
+      </div>
+      <div class="output-area" id="outputArea">
+        <div class="output-line info">// Console output will appear here after running your code</div>
+      </div>
+    </div>
+
+    <div class="panel-content" id="tab-vars">
+      <div class="code-toolbar">
+        <span style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">Variable Inspector</span>
+      </div>
+      <div class="vars-area" id="varsArea">
+        <div class="vars-empty">No variables defined yet</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="mobile-nav" id="mobileNav">
+  <button class="mobile-nav-btn active" id="navCanvas" onclick="mobileNav('canvas')">
+    <span class="nav-icon">🖼</span>Canvas
+  </button>
+  <button class="mobile-nav-btn" id="navBlocks" onclick="mobileNav('blocks')">
+    <span class="nav-icon">🧱</span>Blocks
+  </button>
+  <button class="mobile-nav-btn" id="navCode" onclick="mobileNav('code')">
+    <span class="nav-icon">📄</span>Code
+  </button>
+  <button class="mobile-nav-btn" id="navOutput" onclick="mobileNav('output')">
+    <span class="nav-icon">💻</span>Output
+  </button>
+  <button class="mobile-nav-btn" id="navMore" onclick="mobileNav('more')">
+    <span class="nav-icon">⋯</span>More
+  </button>
+</nav>
+
+<!-- MOBILE FAB (Run) -->
+<button class="mobile-fab" id="mobileFab" onclick="runCode()">▶</button>
+
+<!-- MOBILE BLOCK DRAWER -->
+<div class="mobile-drawer" id="mobileDrawer">
+  <div class="drawer-handle" onclick="closeAllMobile(); document.querySelectorAll('.mobile-nav-btn').forEach(b=>b.classList.remove('active')); document.getElementById('navCanvas').classList.add('active');"></div>
+  <div class="drawer-title">Add Block</div>
+  <input class="drawer-search" id="drawerSearch" placeholder="Search blocks..." oninput="filterDrawerBlocks(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <div class="drawer-blocks" id="drawerBlocks"></div>
+</div>
+
+<!-- MOBILE CODE/OUTPUT/VARS PANEL -->
+<div class="mobile-panel-overlay" id="mobilePanelOverlay">
+  <div class="mobile-panel-header">
+    <span class="mobile-panel-title" id="mobilePanelTitle">Code</span>
+    <button class="mobile-close-btn" onclick="closeMobilePanel()">&#x2715; Close</button>
+  </div>
+  <div id="mobile-tab-code" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+    <div class="code-toolbar" style="justify-content:space-between;">
+      <span id="mobileCodeStats" style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">0 lines</span>
+      <button class="btn btn-secondary" style="padding:5px 12px;font-size:12px;" onclick="copyCode()">Copy</button>
+    </div>
+    <pre id="mobileCodePreview" style="flex:1;overflow:auto;padding:16px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;color:var(--text);background:var(--bg);margin:0;white-space:pre;"><span class="cm"># Your code appears here</span></pre>
+  </div>
+  <div id="mobile-tab-output" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+    <div class="code-toolbar" style="justify-content:space-between;">
+      <span style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">Console</span>
+      <button class="btn btn-secondary" style="padding:5px 12px;font-size:12px;" onclick="clearMobileOutput()">Clear</button>
+    </div>
+    <div class="output-area" id="mobileOutputArea" style="flex:1;overflow:auto;">
+      <div class="output-line info">// Run your program to see output</div>
+    </div>
+  </div>
+  <div id="mobile-tab-vars" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+    <div class="code-toolbar">
+      <span style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;">Variable Inspector</span>
+    </div>
+    <div class="vars-area" id="mobileVarsArea" style="flex:1;overflow-y:auto;padding:12px;">
+      <div class="vars-empty">No variables defined yet</div>
+    </div>
+  </div>
+</div>
+
+<!-- MORE MENU DRAWER -->
+<div class="mobile-drawer" id="mobileMoreDrawer" style="z-index:191;">
+  <div class="drawer-handle" onclick="closeMobileMore();"></div>
+  <div class="drawer-title">Options</div>
+  <div style="padding:8px 12px 20px;display:flex;flex-direction:column;gap:10px;">
+    <button class="btn btn-secondary" style="padding:14px;font-size:15px;text-align:left;" onclick="loadExample();closeMobileMore();">&#x1F4E6; Load Example</button>
+    <button class="btn btn-secondary" style="padding:14px;font-size:15px;text-align:left;" onclick="autoArrange();closeMobileMore();">&#x26A1; Auto-Arrange Blocks</button>
+    <button class="btn btn-secondary" style="padding:14px;font-size:15px;text-align:left;" onclick="exportCode();closeMobileMore();">&#x1F4BE; Export .py File</button>
+    <button class="btn btn-danger" style="padding:14px;font-size:15px;text-align:left;" onclick="clearCanvas();closeMobileMore();">&#x1F5D1; Clear Canvas</button>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="backdrop" id="backdrop" onclick="closePrompt()"></div>
+<div class="floating-prompt" id="floatingPrompt">
+  <h3 id="promptTitle">Enter value</h3>
+  <input id="promptInput" />
+  <div class="fp-btns">
+    <button class="btn btn-secondary" onclick="closePrompt()">Cancel</button>
+    <button class="btn btn-primary" onclick="confirmPrompt()">OK</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// BLOCK DEFINITIONS
+// ============================================================
+const BLOCK_DEFS = [
+  // CONTROL
+  { id: 'if',       cat: 'control', icon: '🔀', label: 'If / Elif / Else', color: '#7c5cfc',
+    fields: [{ name: 'condition', label: 'if', type: 'text', default: 'x > 0' }],
+    code: (f) => `if ${f.condition}:` },
+  { id: 'for',      cat: 'control', icon: '🔁', label: 'For Loop', color: '#7c5cfc',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'i' }, { name: 'iter', label: 'in', type: 'text', default: 'range(10)' }],
+    code: (f) => `for ${f.var} in ${f.iter}:` },
+  { id: 'while',    cat: 'control', icon: '🔄', label: 'While Loop', color: '#7c5cfc',
+    fields: [{ name: 'condition', label: 'while', type: 'text', default: 'True' }],
+    code: (f) => `while ${f.condition}:` },
+  { id: 'break',    cat: 'control', icon: '⛔', label: 'Break', color: '#7c5cfc',
+    fields: [], code: () => 'break' },
+  { id: 'continue', cat: 'control', icon: '⏭', label: 'Continue', color: '#7c5cfc',
+    fields: [], code: () => 'continue' },
+  { id: 'pass',     cat: 'control', icon: '🚶', label: 'Pass', color: '#7c5cfc',
+    fields: [], code: () => 'pass' },
+  { id: 'tryexcept',cat: 'control', icon: '🛡', label: 'Try / Except', color: '#7c5cfc',
+    fields: [{ name: 'exc', label: 'except', type: 'text', default: 'Exception as e' }],
+    code: (f) => `try:\n    pass\nexcept ${f.exc}:` },
+  { id: 'withopen', cat: 'control', icon: '📂', label: 'With / Open', color: '#7c5cfc',
+    fields: [{ name: 'file', label: 'file', type: 'text', default: "'data.txt'" }, { name: 'mode', label: 'mode', type: 'text', default: "'r'" }, { name: 'var', label: 'as', type: 'text', default: 'f' }],
+    code: (f) => `with open(${f.file}, ${f.mode}) as ${f.var}:` },
+
+  // DATA
+  { id: 'assign',   cat: 'data', icon: '📦', label: 'Assign Variable', color: '#00b4d8',
+    fields: [{ name: 'name', label: 'var', type: 'text', default: 'x' }, { name: 'value', label: '=', type: 'text', default: '0' }],
+    code: (f) => `${f.name} = ${f.value}` },
+  { id: 'augassign',cat: 'data', icon: '➕', label: 'Update Variable', color: '#00b4d8',
+    fields: [{ name: 'name', label: 'var', type: 'text', default: 'x' }, { name: 'op', label: 'op', type: 'select', options: ['+=', '-=', '*=', '/=', '//=', '%=', '**='], default: '+=' }, { name: 'value', label: 'val', type: 'text', default: '1' }],
+    code: (f) => `${f.name} ${f.op} ${f.value}` },
+  { id: 'delete',   cat: 'data', icon: '🗑', label: 'Delete Variable', color: '#00b4d8',
+    fields: [{ name: 'name', label: 'del', type: 'text', default: 'x' }],
+    code: (f) => `del ${f.name}` },
+
+  // MATH
+  { id: 'mathexpr', cat: 'math', icon: '🔢', label: 'Math Expression', color: '#06d6a0',
+    fields: [{ name: 'result', label: 'result', type: 'text', default: 'result' }, { name: 'expr', label: '=', type: 'text', default: 'math.sqrt(16)' }],
+    code: (f) => `${f.result} = ${f.expr}` },
+  { id: 'importmath',cat:'math', icon:'📐', label:'Import Math', color:'#06d6a0',
+    fields:[], code: () => 'import math' },
+  { id: 'random',   cat: 'math', icon: '🎲', label: 'Random Number', color: '#06d6a0',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'num' }, { name: 'lo', label: 'from', type: 'text', default: '1' }, { name: 'hi', label: 'to', type: 'text', default: '100' }],
+    code: (f) => `${f.var} = random.randint(${f.lo}, ${f.hi})` },
+  { id: 'importrandom',cat:'math',icon:'🎰',label:'Import Random',color:'#06d6a0',
+    fields:[], code: () => 'import random' },
+
+  // LOGIC
+  { id: 'andor',    cat: 'logic', icon: '🔗', label: 'And / Or Expr', color: '#ff6b6b',
+    fields: [{ name: 'res', label: 'result', type: 'text', default: 'result' }, { name: 'a', label: 'a', type: 'text', default: 'x > 0' }, { name: 'op', label: 'op', type: 'select', options: ['and', 'or', 'not'], default: 'and' }, { name: 'b', label: 'b', type: 'text', default: 'y < 10' }],
+    code: (f) => f.op === 'not' ? `${f.res} = not (${f.a})` : `${f.res} = (${f.a}) ${f.op} (${f.b})` },
+  { id: 'compare',  cat: 'logic', icon: '⚖', label: 'Compare', color: '#ff6b6b',
+    fields: [{ name: 'res', label: 'result', type: 'text', default: 'result' }, { name: 'a', label: 'a', type: 'text', default: 'x' }, { name: 'op', label: 'op', type: 'select', options: ['==', '!=', '<', '>', '<=', '>=', 'in', 'not in', 'is', 'is not'], default: '==' }, { name: 'b', label: 'b', type: 'text', default: '0' }],
+    code: (f) => `${f.res} = ${f.a} ${f.op} ${f.b}` },
+
+  // FUNCTIONS
+  { id: 'defn',     cat: 'function', icon: '🧩', label: 'Define Function', color: '#ffd166',
+    fields: [{ name: 'name', label: 'def', type: 'text', default: 'my_func' }, { name: 'args', label: 'args', type: 'text', default: 'x, y' }],
+    code: (f) => `def ${f.name}(${f.args}):` },
+  { id: 'return',   cat: 'function', icon: '↩', label: 'Return', color: '#ffd166',
+    fields: [{ name: 'value', label: 'return', type: 'text', default: 'result' }],
+    code: (f) => `return ${f.value}` },
+  { id: 'call',     cat: 'function', icon: '📞', label: 'Call Function', color: '#ffd166',
+    fields: [{ name: 'result', label: 'result', type: 'text', default: 'result' }, { name: 'name', label: 'func', type: 'text', default: 'my_func' }, { name: 'args', label: 'args', type: 'text', default: 'x, y' }],
+    code: (f) => `${f.result} = ${f.name}(${f.args})` },
+  { id: 'lambda',   cat: 'function', icon: 'λ', label: 'Lambda', color: '#ffd166',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'fn' }, { name: 'args', label: 'args', type: 'text', default: 'x' }, { name: 'expr', label: 'expr', type: 'text', default: 'x * 2' }],
+    code: (f) => `${f.var} = lambda ${f.args}: ${f.expr}` },
+
+  // I/O
+  { id: 'print',    cat: 'io', icon: '🖨', label: 'Print', color: '#ff9f1c',
+    fields: [{ name: 'value', label: 'print', type: 'text', default: '"Hello, World!"' }],
+    code: (f) => `print(${f.value})` },
+  { id: 'input',    cat: 'io', icon: '⌨', label: 'Input', color: '#ff9f1c',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'name' }, { name: 'prompt', label: 'prompt', type: 'text', default: '"Enter value: "' }],
+    code: (f) => `${f.var} = input(${f.prompt})` },
+  { id: 'filewrite',cat: 'io', icon: '✍', label: 'Write File', color: '#ff9f1c',
+    fields: [{ name: 'file', label: 'file', type: 'text', default: '"output.txt"' }, { name: 'content', label: 'content', type: 'text', default: 'data' }],
+    code: (f) => `with open(${f.file}, 'w') as f:\n    f.write(${f.content})` },
+
+  // LISTS
+  { id: 'listcreate', cat: 'list', icon: '📋', label: 'Create List', color: '#c77dff',
+    fields: [{ name: 'name', label: 'list', type: 'text', default: 'my_list' }, { name: 'items', label: 'items', type: 'text', default: '1, 2, 3' }],
+    code: (f) => `${f.name} = [${f.items}]` },
+  { id: 'listappend',cat:'list',icon:'➕',label:'Append to List',color:'#c77dff',
+    fields:[{name:'list',label:'list',type:'text',default:'my_list'},{name:'item',label:'item',type:'text',default:'value'}],
+    code:(f)=>`${f.list}.append(${f.item})`},
+  { id: 'listpop',  cat: 'list', icon: '➖', label: 'Pop from List', color: '#c77dff',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'item' }, { name: 'list', label: 'list', type: 'text', default: 'my_list' }],
+    code: (f) => `${f.var} = ${f.list}.pop()` },
+  { id: 'listcomp', cat: 'list', icon: '⚡', label: 'List Comprehension', color: '#c77dff',
+    fields: [{ name: 'result', label: 'result', type: 'text', default: 'squares' }, { name: 'expr', label: 'expr', type: 'text', default: 'x**2' }, { name: 'var', label: 'for', type: 'text', default: 'x' }, { name: 'iter', label: 'in', type: 'text', default: 'range(10)' }],
+    code: (f) => `${f.result} = [${f.expr} for ${f.var} in ${f.iter}]` },
+  { id: 'dictcreate',cat:'list',icon:'📖',label:'Create Dict',color:'#c77dff',
+    fields:[{name:'name',label:'dict',type:'text',default:'my_dict'},{name:'items',label:'items',type:'text',default:'"key": "value"'}],
+    code:(f)=>`${f.name} = {${f.items}}`},
+
+  // STRINGS
+  { id: 'fstring',  cat: 'string', icon: '💬', label: 'F-String', color: '#43aa8b',
+    fields: [{ name: 'var', label: 'var', type: 'text', default: 'msg' }, { name: 'tmpl', label: 'f""', type: 'text', default: 'Hello {name}!' }],
+    code: (f) => `${f.var} = f"${f.tmpl}"` },
+  { id: 'strsplit', cat: 'string', icon: '✂', label: 'Split String', color: '#43aa8b',
+    fields: [{ name: 'result', label: 'result', type: 'text', default: 'parts' }, { name: 'string', label: 'str', type: 'text', default: 'text' }, { name: 'sep', label: 'sep', type: 'text', default: '","' }],
+    code: (f) => `${f.result} = ${f.string}.split(${f.sep})` },
+  { id: 'strjoin',  cat: 'string', icon: '🔗', label: 'Join Strings', color: '#43aa8b',
+    fields: [{ name: 'result', label: 'result', type: 'text', default: 'text' }, { name: 'sep', label: 'sep', type: 'text', default: '", "' }, { name: 'iter', label: 'list', type: 'text', default: 'words' }],
+    code: (f) => `${f.result} = ${f.sep}.join(${f.iter})` },
+  { id: 'strformat',cat:'string',icon:'🎨',label:'Format String',color:'#43aa8b',
+    fields:[{name:'result',label:'result',type:'text',default:'msg'},{name:'tmpl',label:'tmpl',type:'text',default:'"Hello, {}!"'},{name:'args',label:'args',type:'text',default:'name'}],
+    code:(f)=>`${f.result} = ${f.tmpl}.format(${f.args})`},
+  { id: 'comment',  cat: 'string', icon: '💭', label: 'Comment', color: '#43aa8b',
+    fields: [{ name: 'text', label: '#', type: 'text', default: 'This is a comment' }],
+    code: (f) => `# ${f.text}` },
+  { id: 'import',   cat: 'string', icon: '📦', label: 'Import Module', color: '#43aa8b',
+    fields: [{ name: 'module', label: 'import', type: 'text', default: 'os' }, { name: 'alias', label: 'as', type: 'text', default: '' }],
+    code: (f) => f.alias ? `import ${f.module} as ${f.alias}` : `import ${f.module}` },
+];
+
+const CAT_META = {
+  control:  { label: 'Control Flow',  color: '#7c5cfc' },
+  data:     { label: 'Data / Variables', color: '#00b4d8' },
+  math:     { label: 'Math',          color: '#06d6a0' },
+  logic:    { label: 'Logic',         color: '#ff6b6b' },
+  function: { label: 'Functions',     color: '#ffd166' },
+  io:       { label: 'Input / Output',color: '#ff9f1c' },
+  list:     { label: 'Lists & Dicts', color: '#c77dff' },
+  string:   { label: 'Strings',       color: '#43aa8b' },
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let blockNodes = []; // { id, defId, x, y, fields, el }
+let connections = []; // { from, to } node ids
+let nextId = 1;
+let zoom = 1;
+let panX = 0, panY = 0;
+let draggingBlock = null;
+let dragOffset = { x: 0, y: 0 };
+let selectedBlock = null;
+
+// ============================================================
+// SIDEBAR INIT
+// ============================================================
+function buildPalette() {
+  const container = document.getElementById('blocksPanel');
+  container.innerHTML = '';
+  const cats = [...new Set(BLOCK_DEFS.map(b => b.cat))];
+  cats.forEach(cat => {
+    const meta = CAT_META[cat];
+    const catHeader = document.createElement('div');
+    catHeader.className = 'cat-header';
+    catHeader.textContent = meta.label;
+    catHeader.style.color = meta.color;
+    container.appendChild(catHeader);
+
+    BLOCK_DEFS.filter(b => b.cat === cat).forEach(def => {
+      const el = document.createElement('div');
+      el.className = 'palette-block';
+      el.style.borderLeftColor = def.color;
+      el.draggable = true;
+      el.innerHTML = `<span class="block-icon">${def.icon}</span><span>${def.label}</span>`;
+      el.title = def.label;
+      el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('defId', def.id);
+      });
+      el.addEventListener('dblclick', () => addBlockToCenter(def.id));
+      container.appendChild(el);
+    });
+  });
+}
+
+function filterBlocks(query) {
+  const container = document.getElementById('searchResults');
+  container.innerHTML = '';
+  if (!query) return;
+  const q = query.toLowerCase();
+  BLOCK_DEFS.filter(b => b.label.toLowerCase().includes(q) || b.cat.includes(q)).forEach(def => {
+    const el = document.createElement('div');
+    el.className = 'palette-block';
+    el.style.borderLeftColor = def.color;
+    el.draggable = true;
+    el.innerHTML = `<span class="block-icon">${def.icon}</span><span>${def.label}</span>`;
+    el.addEventListener('dragstart', e => e.dataTransfer.setData('defId', def.id));
+    el.addEventListener('dblclick', () => addBlockToCenter(def.id));
+    container.appendChild(el);
+  });
+}
+
+function switchSideTab(tab, el) {
+  document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('blocksPanel').style.display = tab === 'blocks' ? '' : 'none';
+  document.getElementById('searchPanel').style.display = tab === 'search' ? '' : 'none';
+}
+
+// ============================================================
+// CANVAS DnD
+// ============================================================
+const canvasWrap = document.getElementById('canvasWrap');
+const canvas = document.getElementById('canvas');
+
+canvasWrap.addEventListener('dragover', e => { e.preventDefault(); });
+canvasWrap.addEventListener('drop', e => {
+  e.preventDefault();
+  const defId = e.dataTransfer.getData('defId');
+  if (!defId) return;
+  const rect = canvasWrap.getBoundingClientRect();
+  const x = (e.clientX - rect.left - panX) / zoom;
+  const y = (e.clientY - rect.top - panY) / zoom;
+  addBlock(defId, x, y);
+});
+
+// ============================================================
+// ADD BLOCK
+// ============================================================
+function addBlockToCenter(defId) {
+  const rect = canvasWrap.getBoundingClientRect();
+  const x = (rect.width / 2 - panX) / zoom - 90 + Math.random() * 60 - 30;
+  const y = (rect.height / 2 - panY) / zoom - 50 + Math.random() * 60 - 30;
+  addBlock(defId, x, y);
+}
+
+function addBlock(defId, x, y) {
+  const def = BLOCK_DEFS.find(b => b.id === defId);
+  if (!def) return;
+
+  const id = `block_${nextId++}`;
+  const fields = {};
+  def.fields.forEach(f => fields[f.name] = f.default);
+
+  const el = document.createElement('div');
+  el.className = 'block-node';
+  el.id = id;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.borderTop = `3px solid ${def.color}`;
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'block-header';
+  header.style.background = hexAlpha(def.color, 0.25);
+  header.innerHTML = `
+    <span class="bh-icon">${def.icon}</span>
+    <span class="bh-label">${def.label}</span>
+    <button class="block-close" onclick="removeBlock('${id}')">✕</button>
+  `;
+
+  // Body with fields
+  const body = document.createElement('div');
+  body.className = 'block-body';
+
+  def.fields.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'block-field';
+    let inputEl;
+    if (f.type === 'select') {
+      inputEl = document.createElement('select');
+      f.options.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt; o.textContent = opt;
+        if (opt === f.default) o.selected = true;
+        inputEl.appendChild(o);
+      });
+    } else {
+      inputEl = document.createElement('input');
+      inputEl.type = 'text';
+      inputEl.value = f.default;
+      inputEl.placeholder = f.label;
+    }
+    inputEl.addEventListener('input', ev => {
+      fields[f.name] = ev.target.value;
+      updateCodePreview();
+      updateVars();
+    });
+    inputEl.addEventListener('change', ev => { fields[f.name] = ev.target.value; updateCodePreview(); updateVars(); });
+    row.innerHTML = `<label>${f.label}</label>`;
+    row.appendChild(inputEl);
+    body.appendChild(row);
+  });
+
+  // Connectors
+  const connTop = document.createElement('div');
+  connTop.className = 'block-connector top';
+  connTop.title = 'Connect from here';
+  const connBot = document.createElement('div');
+  connBot.className = 'block-connector bottom';
+  connBot.title = 'Connect to next';
+
+  el.appendChild(connTop);
+  el.appendChild(header);
+  el.appendChild(body);
+  el.appendChild(connBot);
+  canvas.appendChild(el);
+
+  // Dragging (mouse)
+  header.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('block-close')) return;
+    e.preventDefault();
+    draggingBlock = id;
+    selectBlock(id);
+    const rect = el.getBoundingClientRect();
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+    el.classList.add('dragging');
+  });
+
+  // Touch dragging
+  header.addEventListener('touchstart', e => {
+    if (e.target.classList.contains('block-close')) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    draggingBlock = id;
+    selectBlock(id);
+    const rect = el.getBoundingClientRect();
+    dragOffset.x = touch.clientX - rect.left;
+    dragOffset.y = touch.clientY - rect.top;
+    el.classList.add('dragging');
+  }, { passive: false });
+
+  el.addEventListener('mousedown', e => {
+    selectBlock(id);
+  });
+
+  const node = { id, defId, x, y, fields, el, def };
+  blockNodes.push(node);
+
+  updateHint();
+  updateCodePreview();
+  updateStatus();
+  updateVars();
+}
+
+function removeBlock(id) {
+  connections = connections.filter(c => c.from !== id && c.to !== id);
+  const node = blockNodes.find(b => b.id === id);
+  if (node) node.el.remove();
+  blockNodes = blockNodes.filter(b => b.id !== id);
+  if (selectedBlock === id) selectedBlock = null;
+  updateHint();
+  updateCodePreview();
+  drawConnections();
+  updateStatus();
+  updateVars();
+}
+
+function selectBlock(id) {
+  if (selectedBlock) {
+    const prev = document.getElementById(selectedBlock);
+    if (prev) prev.classList.remove('selected');
+  }
+  selectedBlock = id;
+  const el = document.getElementById(id);
+  if (el) el.classList.add('selected');
+}
+
+// ============================================================
+// MOUSE DRAG
+// ============================================================
+document.addEventListener('mousemove', e => {
+  if (!draggingBlock) return;
+  const node = blockNodes.find(b => b.id === draggingBlock);
+  if (!node) return;
+  const rect = canvasWrap.getBoundingClientRect();
+  const x = (e.clientX - rect.left - dragOffset.x - panX) / zoom;
+  const y = (e.clientY - rect.top - dragOffset.y - panY) / zoom;
+  node.el.style.left = x + 'px';
+  node.el.style.top = y + 'px';
+  node.x = x; node.y = y;
+  drawConnections();
+});
+document.addEventListener('mouseup', e => {
+  if (draggingBlock) {
+    const node = blockNodes.find(b => b.id === draggingBlock);
+    if (node) node.el.classList.remove('dragging');
+    draggingBlock = null;
+  }
+});
+
+// Touch move/end for block dragging
+document.addEventListener('touchmove', e => {
+  if (!draggingBlock) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const node = blockNodes.find(b => b.id === draggingBlock);
+  if (!node) return;
+  const rect = canvasWrap.getBoundingClientRect();
+  const x = (touch.clientX - rect.left - dragOffset.x - panX) / zoom;
+  const y = (touch.clientY - rect.top - dragOffset.y - panY) / zoom;
+  node.el.style.left = x + 'px';
+  node.el.style.top = y + 'px';
+  node.x = x; node.y = y;
+  drawConnections();
+}, { passive: false });
+document.addEventListener('touchend', e => {
+  if (draggingBlock) {
+    const node = blockNodes.find(b => b.id === draggingBlock);
+    if (node) node.el.classList.remove('dragging');
+    draggingBlock = null;
+  }
+});
+
+// ============================================================
+// ZOOM / PAN
+// ============================================================
+canvasWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  zoom = Math.min(2, Math.max(0.3, zoom * factor));
+  applyZoom();
+}, { passive: false });
+
+// Pinch to zoom (touch)
+let lastPinchDist = null;
+canvasWrap.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) lastPinchDist = null;
+}, { passive: true });
+canvasWrap.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && !draggingBlock) {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (lastPinchDist !== null) {
+      const factor = dist / lastPinchDist;
+      zoom = Math.min(2, Math.max(0.3, zoom * factor));
+      applyZoom();
+    }
+    lastPinchDist = dist;
+  }
+}, { passive: false });
+canvasWrap.addEventListener('touchend', e => {
+  if (e.touches.length < 2) lastPinchDist = null;
+}, { passive: true });
+
+function applyZoom() {
+  canvas.style.transform = `scale(${zoom}) translate(${panX}px, ${panY}px)`;
+  canvas.style.transformOrigin = '0 0';
+}
+function zoomIn() { zoom = Math.min(2, zoom * 1.15); applyZoom(); }
+function zoomOut() { zoom = Math.max(0.3, zoom / 1.15); applyZoom(); }
+function resetView() { zoom = 1; panX = 0; panY = 0; applyZoom(); }
+
+function autoArrange() {
+  const cols = Math.ceil(Math.sqrt(blockNodes.length));
+  blockNodes.forEach((node, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    node.x = 40 + col * 220;
+    node.y = 40 + row * 160;
+    node.el.style.left = node.x + 'px';
+    node.el.style.top = node.y + 'px';
+  });
+  drawConnections();
+  setStatus('Auto-arranged!');
+}
+
+// ============================================================
+// CONNECTIONS (SVG)
+// ============================================================
+function drawConnections() {
+  const svg = document.getElementById('svgLayer');
+  svg.innerHTML = '';
+  connections.forEach(({ from, to }) => {
+    const fn = blockNodes.find(b => b.id === from);
+    const tn = blockNodes.find(b => b.id === to);
+    if (!fn || !tn) return;
+    const fr = fn.el.getBoundingClientRect();
+    const tr = tn.el.getBoundingClientRect();
+    const cr = canvasWrap.getBoundingClientRect();
+    const x1 = fr.left + fr.width / 2 - cr.left;
+    const y1 = fr.bottom - cr.top;
+    const x2 = tr.left + tr.width / 2 - cr.left;
+    const y2 = tr.top - cr.top;
+    const cy = (y1 + y2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${x1},${cy} ${x2},${cy} ${x2},${y2}`);
+    path.setAttribute('class', 'conn-line');
+    svg.appendChild(path);
+  });
+}
+
+// ============================================================
+// CODE GENERATION
+// ============================================================
+function generateCode() {
+  if (blockNodes.length === 0) return '# Add some blocks to generate code!';
+  let lines = [];
+  // Order by Y position (top to bottom)
+  const sorted = [...blockNodes].sort((a, b) => a.y - b.y);
+  sorted.forEach(node => {
+    const def = node.def;
+    const codeStr = def.code(node.fields);
+    lines.push(codeStr);
+  });
+  return lines.join('\n');
+}
+
+function syntaxHighlight(code) {
+  const keywords = ['def', 'return', 'if', 'elif', 'else', 'for', 'while', 'in', 'not', 'and', 'or', 'import', 'from', 'as', 'try', 'except', 'finally', 'with', 'pass', 'break', 'continue', 'class', 'lambda', 'del', 'is', 'True', 'False', 'None', 'raise', 'yield', 'global', 'nonlocal'];
+  const builtins = ['print', 'input', 'range', 'len', 'int', 'str', 'float', 'bool', 'list', 'dict', 'tuple', 'set', 'type', 'isinstance', 'hasattr', 'getattr', 'setattr', 'open', 'enumerate', 'zip', 'map', 'filter', 'sorted', 'reversed', 'min', 'max', 'sum', 'abs', 'round'];
+
+  let result = '';
+  const lines = code.split('\n');
+  lines.forEach((line, li) => {
+    if (li > 0) result += '\n';
+    // Comment
+    const commentIdx = line.indexOf('#');
+    if (commentIdx !== -1) {
+      result += processLine(line.slice(0, commentIdx), keywords, builtins);
+      result += `<span class="cm">${escHtml(line.slice(commentIdx))}</span>`;
+      return;
+    }
+    result += processLine(line, keywords, builtins);
+  });
+  return result;
+}
+
+function processLine(line, keywords, builtins) {
+  let result = '';
+  const tokens = line.split(/(\s+|[()[\]{},.:+\-*/%=<>!&|^~]+|"[^"]*"|'[^']*'|\b\w+\b)/);
+  tokens.forEach(token => {
+    if (!token) return;
+    if (/^["'].*["']$/.test(token)) {
+      result += `<span class="st">${escHtml(token)}</span>`;
+    } else if (keywords.includes(token)) {
+      result += `<span class="kw">${token}</span>`;
+    } else if (builtins.includes(token)) {
+      result += `<span class="bltn">${token}</span>`;
+    } else if (/^\d+(\.\d+)?$/.test(token)) {
+      result += `<span class="nm">${token}</span>`;
+    } else if (/^[+\-*/%=<>!&|^~()[\]{},.:]+$/.test(token)) {
+      result += `<span class="op">${escHtml(token)}</span>`;
+    } else {
+      result += escHtml(token);
+    }
+  });
+  return result;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function updateCodePreview() {
+  const code = generateCode();
+  document.getElementById('codePreview').innerHTML = syntaxHighlight(code);
+  const lines = code.split('\n').length;
+  document.getElementById('codeStats').textContent = `${lines} lines · ${code.length} chars`;
+  document.getElementById('lineCount').textContent = lines;
+  // sync mobile
+  if (document.getElementById('mobileCodePreview')) {
+    document.getElementById('mobileCodePreview').innerHTML = syntaxHighlight(code);
+    document.getElementById('mobileCodeStats').textContent = `${lines} lines · ${code.length} chars`;
+  }
+}
+
+// ============================================================
+// VARIABLE INSPECTOR
+// ============================================================
+function updateVars() {
+  const area = document.getElementById('varsArea');
+  const vars = {};
+  blockNodes.forEach(node => {
+    if (node.defId === 'assign' || node.defId === 'augassign') {
+      const name = node.fields.name;
+      const val = node.fields.value;
+      if (name) vars[name] = { val, type: inferType(val) };
+    }
+    if (node.defId === 'listcreate') vars[node.fields.name] = { val: `[${node.fields.items}]`, type: 'list' };
+    if (node.defId === 'dictcreate') vars[node.fields.name] = { val: `{...}`, type: 'dict' };
+    if (node.defId === 'listcomp') vars[node.fields.result] = { val: '[...]', type: 'list' };
+    if (node.defId === 'fstring' || node.defId === 'strformat') vars[node.fields.var] = { val: `"..."`, type: 'str' };
+    if (node.defId === 'random') vars[node.fields.var] = { val: `random(${node.fields.lo}..${node.fields.hi})`, type: 'int' };
+    if (node.defId === 'input') vars[node.fields.var] = { val: 'user input', type: 'str' };
+    if (node.defId === 'call') vars[node.fields.result] = { val: `${node.fields.name}(...)`, type: 'any' };
+    if (node.defId === 'lambda') vars[node.fields.var] = { val: `lambda ${node.fields.args}: ...`, type: 'function' };
+  });
+
+  if (Object.keys(vars).length === 0) {
+    area.innerHTML = '<div class="vars-empty">No variables defined yet</div>';
+    if (document.getElementById('mobileVarsArea')) document.getElementById('mobileVarsArea').innerHTML = area.innerHTML;
+    return;
+  }
+  area.innerHTML = Object.entries(vars).map(([k, v]) =>
+    `<div class="var-row">
+      <span class="var-name">${k}</span>
+      <span class="var-val" title="${v.val}">${v.val}</span>
+      <span class="var-type">${v.type}</span>
+    </div>`
+  ).join('');
+  if (document.getElementById('mobileVarsArea')) document.getElementById('mobileVarsArea').innerHTML = area.innerHTML;
+}
+
+function inferType(val) {
+  if (!isNaN(Number(val))) return Number.isInteger(Number(val)) ? 'int' : 'float';
+  if (val.startsWith('"') || val.startsWith("'")) return 'str';
+  if (val === 'True' || val === 'False') return 'bool';
+  if (val === 'None') return 'NoneType';
+  if (val.startsWith('[')) return 'list';
+  if (val.startsWith('{')) return 'dict';
+  return 'any';
+}
+
+// ============================================================
+// RUN CODE (Simulated Python Interpreter)
+// ============================================================
+function runCode() {
+  if (isMobile()) {
+    openMobilePanel('output');
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('navOutput').classList.add('active');
+  } else {
+    const tabEl = document.querySelector('.panel-tab:nth-child(2)');
+    if (tabEl) switchTab('output', tabEl);
+  }
+  const code = generateCode();
+  const output = document.getElementById('outputArea');
+  const mobileOutput = document.getElementById('mobileOutputArea');
+  const addLine = (text, cls) => {
+    [output, mobileOutput].forEach(o => {
+      if (!o) return;
+      const div = document.createElement('div');
+      div.className = `output-line ${cls}`;
+      div.textContent = text;
+      o.appendChild(div);
+    });
+  };
+  output.innerHTML = '<div class="output-line info">&#x26A1; Running program...</div>';
+  if (mobileOutput) mobileOutput.innerHTML = '<div class="output-line info">&#x26A1; Running program...</div>';
+
+  setTimeout(() => {
+    try {
+      const lines = code.split('\n');
+      const results = simulateExecution(lines);
+      results.forEach(r => addLine(r.text, r.type));
+      addLine(`\n&#x2705; Program finished (${results.filter(r=>r.type==='out').length} outputs)`, 'info');
+      setStatus('Run complete');
+    } catch (e) {
+      addLine(`RuntimeError: ${e.message}`, 'err');
+    }
+  }, 100);
+}
+
+function simulateExecution(lines) {
+  const results = [];
+  const env = {};
+  import_math_available = false;
+  import_random_available = false;
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      if (trimmed.startsWith('#')) results.push({ type: 'info', text: trimmed });
+      return;
+    }
+
+    // Import
+    if (trimmed.startsWith('import math')) { import_math_available = true; return; }
+    if (trimmed.startsWith('import random')) { import_random_available = true; return; }
+    if (trimmed.startsWith('import ')) { results.push({ type: 'info', text: `📦 ${trimmed}` }); return; }
+
+    // Print
+    const printMatch = trimmed.match(/^print\((.+)\)$/);
+    if (printMatch) {
+      const val = evalExpr(printMatch[1], env);
+      results.push({ type: 'out', text: String(val) });
+      return;
+    }
+
+    // Assignment: var = val
+    const assignMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+    if (assignMatch && !trimmed.includes('==') && !trimmed.includes('!=') && !trimmed.includes('<=') && !trimmed.includes('>=')) {
+      try {
+        const val = evalExpr(assignMatch[2], env);
+        env[assignMatch[1]] = val;
+        results.push({ type: 'info', text: `→ ${assignMatch[1]} = ${JSON.stringify(val)}` });
+      } catch(e) {}
+      return;
+    }
+
+    // Aug assign
+    const augMatch = trimmed.match(/^(\w+)\s*(\+=|-=|\*=|\/=|\/\/=|%=|\*\*=)\s*(.+)$/);
+    if (augMatch) {
+      try {
+        const curr = env[augMatch[1]] || 0;
+        const rhs = evalExpr(augMatch[3], env);
+        let newVal;
+        switch(augMatch[2]) {
+          case '+=': newVal = curr + rhs; break;
+          case '-=': newVal = curr - rhs; break;
+          case '*=': newVal = curr * rhs; break;
+          case '/=': newVal = curr / rhs; break;
+          case '//=': newVal = Math.floor(curr / rhs); break;
+          case '%=': newVal = curr % rhs; break;
+          case '**=': newVal = Math.pow(curr, rhs); break;
+        }
+        env[augMatch[1]] = newVal;
+        results.push({ type: 'info', text: `→ ${augMatch[1]} = ${newVal}` });
+      } catch(e) {}
+      return;
+    }
+
+    // For loop - simplified
+    const forMatch = trimmed.match(/^for\s+(\w+)\s+in\s+(.+):$/);
+    if (forMatch) {
+      results.push({ type: 'info', text: `🔁 for ${forMatch[1]} in ${forMatch[2]}` });
+      return;
+    }
+
+    // Def function
+    const defMatch = trimmed.match(/^def\s+(\w+)\((.*)\):$/);
+    if (defMatch) {
+      results.push({ type: 'info', text: `🧩 Defined function: ${defMatch[1]}(${defMatch[2]})` });
+      return;
+    }
+
+    // If statement
+    if (trimmed.startsWith('if ') || trimmed.startsWith('elif ') || trimmed.startsWith('else:')) {
+      results.push({ type: 'info', text: `🔀 ${trimmed}` });
+      return;
+    }
+
+    // Random
+    const randMatch = trimmed.match(/^(\w+)\s*=\s*random\.randint\((\d+),\s*(\d+)\)$/);
+    if (randMatch) {
+      const lo = parseInt(randMatch[2]), hi = parseInt(randMatch[3]);
+      const val = Math.floor(Math.random() * (hi - lo + 1)) + lo;
+      env[randMatch[1]] = val;
+      results.push({ type: 'info', text: `🎲 ${randMatch[1]} = ${val}` });
+      return;
+    }
+
+    results.push({ type: 'info', text: `  ${trimmed}` });
+  });
+
+  return results;
+}
+
+let import_math_available = false;
+let import_random_available = false;
+
+function evalExpr(expr, env) {
+  expr = expr.trim();
+  // String literals
+  if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
+    return expr.slice(1, -1);
+  }
+  // F-string
+  if (expr.startsWith('f"') || expr.startsWith("f'")) {
+    let s = expr.slice(2, -1);
+    s = s.replace(/\{(\w+)\}/g, (_, k) => env[k] !== undefined ? env[k] : k);
+    return s;
+  }
+  // Number
+  if (!isNaN(Number(expr))) return Number(expr);
+  // Bool / None
+  if (expr === 'True') return true;
+  if (expr === 'False') return false;
+  if (expr === 'None') return null;
+  // List
+  if (expr.startsWith('[') && expr.endsWith(']')) {
+    try { return JSON.parse(expr); } catch { return expr; }
+  }
+  // Variable lookup
+  if (/^\w+$/.test(expr) && env[expr] !== undefined) return env[expr];
+  // Math
+  try {
+    const safeExpr = expr.replace(/\*\*/g, '**').replace(/math\./g, 'Math.');
+    return Function(`"use strict"; const e=${JSON.stringify(env)}; with(e){ return (${safeExpr}); }`)();
+  } catch { return expr; }
+}
+
+// ============================================================
+// UTILITY
+// ============================================================
+function hexAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function updateHint() {
+  document.getElementById('canvasHint').style.opacity = blockNodes.length === 0 ? '1' : '0';
+}
+
+function updateStatus() {
+  document.getElementById('blockCount').textContent = blockNodes.length;
+}
+
+function setStatus(msg) {
+  document.getElementById('statusMsg').textContent = msg;
+  setTimeout(() => document.getElementById('statusMsg').textContent = 'Ready', 3000);
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function clearCanvas() {
+  if (blockNodes.length === 0) return;
+  if (!confirm('Clear all blocks?')) return;
+  blockNodes.forEach(n => n.el.remove());
+  blockNodes = [];
+  connections = [];
+  selectedBlock = null;
+  document.getElementById('svgLayer').innerHTML = '';
+  updateHint();
+  updateCodePreview();
+  updateStatus();
+  updateVars();
+  setStatus('Canvas cleared');
+}
+
+function clearOutput() {
+  document.getElementById('outputArea').innerHTML = '<div class="output-line info">// Console cleared</div>';
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(generateCode()).then(() => setStatus('Code copied!'));
+}
+
+function exportCode() {
+  const code = generateCode();
+  const blob = new Blob([code], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = document.getElementById('projectName').value || 'program.py';
+  a.click();
+  setStatus('Exported!');
+}
+
+// ============================================================
+// EXAMPLES
+// ============================================================
+function loadExample() {
+  const examples = [
+    {
+      name: 'Hello World',
+      blocks: [
+        { defId: 'comment', x: 80, y: 40, fields: { text: 'Simple Hello World program' } },
+        { defId: 'assign', x: 80, y: 100, fields: { name: 'name', value: '"World"' } },
+        { defId: 'fstring', x: 80, y: 160, fields: { var: 'msg', tmpl: 'Hello, {name}!' } },
+        { defId: 'print', x: 80, y: 220, fields: { value: 'msg' } },
+      ]
+    },
+    {
+      name: 'Counter Loop',
+      blocks: [
+        { defId: 'assign', x: 80, y: 40, fields: { name: 'total', value: '0' } },
+        { defId: 'for', x: 80, y: 100, fields: { var: 'i', iter: 'range(5)' } },
+        { defId: 'augassign', x: 120, y: 160, fields: { name: 'total', op: '+=', value: 'i' } },
+        { defId: 'print', x: 120, y: 220, fields: { value: 'f"i={i}, total={total}"' } },
+        { defId: 'print', x: 80, y: 280, fields: { value: 'f"Final total: {total}"' } },
+      ]
+    },
+    {
+      name: 'Function + Math',
+      blocks: [
+        { defId: 'importmath', x: 80, y: 20, fields: {} },
+        { defId: 'defn', x: 80, y: 80, fields: { name: 'circle_area', args: 'r' } },
+        { defId: 'return', x: 120, y: 140, fields: { value: 'math.pi * r ** 2' } },
+        { defId: 'call', x: 80, y: 210, fields: { result: 'area', name: 'circle_area', args: '5' } },
+        { defId: 'print', x: 80, y: 270, fields: { value: 'f"Area: {area:.2f}"' } },
+      ]
+    }
+  ];
+
+  const choice = prompt(`Choose example (type number):\n${examples.map((e,i) => `${i+1}. ${e.name}`).join('\n')}`);
+  const idx = parseInt(choice) - 1;
+  if (isNaN(idx) || !examples[idx]) return;
+
+  clearCanvas();
+  const ex = examples[idx];
+  document.getElementById('projectName').value = ex.name.toLowerCase().replace(/ /g,'_') + '.py';
+  setTimeout(() => {
+    ex.blocks.forEach(b => {
+      addBlock(b.defId, b.x, b.y);
+      const node = blockNodes[blockNodes.length - 1];
+      Object.assign(node.fields, b.fields);
+      const inputs = node.el.querySelectorAll('input, select');
+      const defFields = node.def.fields;
+      inputs.forEach((inp, i) => { if (defFields[i]) inp.value = node.fields[defFields[i].name]; });
+      updateCodePreview();
+      updateVars();
+    });
+    setStatus(`Loaded: ${ex.name}`);
+  }, 50);
+}
+
+// ============================================================
+// MOBILE NAVIGATION & PANELS
+// ============================================================
+let currentMobilePanel = null;
+
+function isMobile() {
+  return window.innerWidth <= 768;
+}
+
+function mobileNav(tab) {
+  const navBtn = document.getElementById('nav' + tab.charAt(0).toUpperCase() + tab.slice(1));
+
+  // Toggle: if already open, close it
+  if (currentMobilePanel === tab) {
+    closeAllMobile();
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('navCanvas').classList.add('active');
+    return;
+  }
+
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+  if (navBtn) navBtn.classList.add('active');
+
+  closeAllMobile();
+
+  if (tab === 'blocks') {
+    openMobileDrawer();
+  } else if (tab === 'code') {
+    openMobilePanel('code');
+  } else if (tab === 'output') {
+    openMobilePanel('output');
+  } else if (tab === 'more') {
+    openMobileMore();
+    document.getElementById('navCanvas').classList.add('active');
+    if (navBtn) navBtn.classList.remove('active');
+  } else if (tab === 'canvas') {
+    document.getElementById('navCanvas').classList.add('active');
+  }
+}
+
+function openMobileMore() {
+  document.getElementById('mobileMoreDrawer').classList.add('open');
+  document.getElementById('backdrop').style.display = 'block';
+}
+
+function closeMobileMore() {
+  document.getElementById('mobileMoreDrawer').classList.remove('open');
+  document.getElementById('backdrop').style.display = 'none';
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('navCanvas').classList.add('active');
+}
+
+function openMobilePanel(type) {
+  const overlay = document.getElementById('mobilePanelOverlay');
+  const titleEl = document.getElementById('mobilePanelTitle');
+  ['code','output','vars'].forEach(t => {
+    const el = document.getElementById('mobile-tab-' + t);
+    if (el) el.style.display = 'none';
+  });
+  const target = document.getElementById('mobile-tab-' + type);
+  if (target) target.style.display = 'flex';
+  const titles = { code: 'Python Code', output: 'Output Console', vars: 'Variables' };
+  titleEl.textContent = titles[type] || type;
+  overlay.classList.add('open');
+  currentMobilePanel = type;
+  if (type === 'code') {
+    const code = generateCode();
+    document.getElementById('mobileCodePreview').innerHTML = syntaxHighlight(code);
+    const lines = code.split('\n').length;
+    document.getElementById('mobileCodeStats').textContent = `${lines} lines · ${code.length} chars`;
+  }
+  if (type === 'vars') {
+    document.getElementById('mobileVarsArea').innerHTML = document.getElementById('varsArea').innerHTML;
+  }
+}
+
+function closeMobilePanel() {
+  document.getElementById('mobilePanelOverlay').classList.remove('open');
+  currentMobilePanel = null;
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('navCanvas').classList.add('active');
+}
+
+function closeAllMobile() {
+  document.getElementById('mobileDrawer').classList.remove('open');
+  document.getElementById('mobileMoreDrawer').classList.remove('open');
+  document.getElementById('mobilePanelOverlay').classList.remove('open');
+  document.getElementById('backdrop').style.display = 'none';
+  currentMobilePanel = null;
+}
+
+function openMobileDrawer() {
+  document.getElementById('mobileDrawer').classList.add('open');
+  document.getElementById('backdrop').style.display = 'block';
+  buildDrawerBlocks();
+  currentMobilePanel = 'blocks';
+}
+
+function buildDrawerBlocks() {
+  const container = document.getElementById('drawerBlocks');
+  container.innerHTML = '';
+  document.getElementById('drawerSearch').value = '';
+  const cats = [...new Set(BLOCK_DEFS.map(b => b.cat))];
+  cats.forEach(cat => {
+    const meta = CAT_META[cat];
+    const catHeader = document.createElement('div');
+    catHeader.className = 'cat-header';
+    catHeader.textContent = meta.label;
+    catHeader.style.color = meta.color;
+    container.appendChild(catHeader);
+    BLOCK_DEFS.filter(b => b.cat === cat).forEach(def => {
+      container.appendChild(createDrawerBlock(def));
+    });
+  });
+}
+
+function createDrawerBlock(def) {
+  const el = document.createElement('div');
+  el.className = 'palette-block';
+  el.style.borderLeftColor = def.color;
+  el.innerHTML = `<span class="block-icon">${def.icon}</span><span>${def.label}</span>`;
+  el.addEventListener('click', () => {
+    addBlockToCenter(def.id);
+    closeAllMobile();
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('navCanvas').classList.add('active');
+    setStatus(`Added: ${def.label}`);
+  });
+  return el;
+}
+
+function filterDrawerBlocks(query) {
+  const container = document.getElementById('drawerBlocks');
+  container.innerHTML = '';
+  const q = query.toLowerCase().trim();
+  if (!q) { buildDrawerBlocks(); return; }
+  const results = BLOCK_DEFS.filter(b => b.label.toLowerCase().includes(q) || b.cat.includes(q));
+  if (results.length === 0) {
+    container.innerHTML = '<div class="vars-empty">No blocks found</div>';
+    return;
+  }
+  results.forEach(def => container.appendChild(createDrawerBlock(def)));
+}
+
+function clearMobileOutput() {
+  document.getElementById('mobileOutputArea').innerHTML = '<div class="output-line info">// Console cleared</div>';
+}
+
+// ============================================================
+// PROMPT UTILS
+// ============================================================
+let promptResolve = null;
+function showPrompt(title) {
+  document.getElementById('promptTitle').textContent = title;
+  document.getElementById('promptInput').value = '';
+  document.getElementById('floatingPrompt').style.display = '';
+  document.getElementById('backdrop').style.display = '';
+  document.getElementById('promptInput').focus();
+  return new Promise(r => promptResolve = r);
+}
+function confirmPrompt() {
+  const val = document.getElementById('promptInput').value;
+  closePrompt();
+  if (promptResolve) promptResolve(val);
+}
+function closePrompt() {
+  document.getElementById('floatingPrompt').style.display = 'none';
+  document.getElementById('backdrop').style.display = 'none';
+}
+document.getElementById('promptInput').addEventListener('keydown', e => { if (e.key === 'Enter') confirmPrompt(); });
+
+// ============================================================
+// INIT
+// ============================================================
+buildPalette();
+updateCodePreview();
+
+// Touch device hint
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+  const hint = document.getElementById('canvasHintText');
+  if (hint) hint.innerHTML = 'Tap <strong style="color:var(--accent)">Blocks</strong> below<br>to add blocks to your program';
+}
+
+// Tap canvas to dismiss any open mobile drawer
+document.getElementById('canvasWrap').addEventListener('touchstart', e => {
+  const drawer = document.getElementById('mobileDrawer');
+  const moreDrawer = document.getElementById('mobileMoreDrawer');
+  const panel = document.getElementById('mobilePanelOverlay');
+  if (drawer.classList.contains('open') || moreDrawer.classList.contains('open') || panel.classList.contains('open')) {
+    closeAllMobile();
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('navCanvas').classList.add('active');
+  }
+}, { passive: true });
+</script>
+</body>
+</html>
